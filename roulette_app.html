@@ -444,12 +444,14 @@ body::after {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.28s ease;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
 .overlay.open {
   opacity: 1;
+  visibility: visible;
   pointer-events: all;
   touch-action: pan-y;
 }
@@ -938,12 +940,14 @@ body::after {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.28s ease;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
 #resultOverlay.open {
   opacity: 1;
+  visibility: visible;
   pointer-events: all;
 }
 
@@ -1943,9 +1947,16 @@ function showResult(idx) {
   playFanfare();
 }
 
-resultOkBtn.addEventListener('click', () => {
+function closeResult() {
   resultOverlay.classList.remove('open');
   stopConfetti();
+}
+
+resultOkBtn.addEventListener('click', closeResult);
+
+/* Background tap to close result overlay */
+resultOverlay.addEventListener('click', e => {
+  if (e.target === resultOverlay) closeResult();
 });
 
 /* ===========================
@@ -2400,13 +2411,26 @@ function updateCheatDot() {
 /* ===========================
    START BUTTON
 =========================== */
+let startBtnTouched = false;
+
+startBtn.addEventListener('touchstart', e => {
+  startBtnTouched = true;
+  warmUpAudio(); /* Unlock audio on touch before spin starts */
+}, { passive: true });
+
+startBtn.addEventListener('touchend', e => {
+  if (startBtnTouched && !startBtn.disabled) {
+    e.preventDefault(); /* Prevent subsequent click event */
+    startBtnTouched = false;
+    startSpin();
+  }
+});
+
 startBtn.addEventListener('click', () => {
+  if (startBtnTouched) { startBtnTouched = false; return; } /* Already handled by touchend */
   warmUpAudio();
   startSpin();
 });
-startBtn.addEventListener('touchstart', e => {
-  warmUpAudio(); /* Unlock audio on touch before spin starts */
-}, { passive: true });
 
 /* ===========================
    PREVENT UNWANTED BROWSER BEHAVIOUR
