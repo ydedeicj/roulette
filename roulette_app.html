@@ -1145,6 +1145,18 @@ body::after {
       </div>
 
       <button id="saveBtn">設定を保存</button>
+
+      <div style="margin-top:32px; padding-top:18px; border-top:1px solid rgba(255,0,255,0.15);">
+        <button id="resetAppBtn" style="
+          width:100%; height:44px; border-radius:11px;
+          border:1.5px solid rgba(255,80,80,0.5);
+          background:rgba(255,40,40,0.1);
+          color:rgba(255,120,120,0.9);
+          font-size:14px; font-weight:700; letter-spacing:1px;
+          cursor:pointer; -webkit-appearance:none;
+          transition:background 0.2s, border-color 0.2s;
+        ">アプリをリセット</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2295,6 +2307,12 @@ saveBtn.addEventListener('click', () => {
   drawWheel(wheelAngle);
   updateCheatSel();
   closeSettings();
+});
+
+document.getElementById('resetAppBtn').addEventListener('click', () => {
+  if (confirm('アプリを再読み込みします。よろしいですか？')) {
+    location.reload();
+  }
 });
 
 settingsCloseBtn.addEventListener('click', closeSettings);
