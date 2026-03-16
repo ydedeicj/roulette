@@ -1296,32 +1296,39 @@ muteBtn.addEventListener('click', () => {
 /* Lazily create AudioContext on first user interaction */
 let audioReady = false;
 function getAudioCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume().then(() => { audioReady = true; });
-  } else {
-    audioReady = true;
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(() => { audioReady = true; }).catch(() => {});
+    } else {
+      audioReady = true;
+    }
+  } catch (e) {
+    /* AudioContext creation may fail in some standalone/PWA environments */
   }
   return audioCtx;
 }
 
 /* Wake up audio context — call on ANY user tap so it's ready before spin */
 function warmUpAudio() {
-  const ctx = getAudioCtx();
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(() => { audioReady = true; });
-  }
-  /* Play a silent buffer to fully unlock iOS audio */
-  if (!audioReady) {
-    const buf = ctx.createBuffer(1, 1, 22050);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start(0);
-    audioReady = true;
-  }
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => { audioReady = true; }).catch(() => {});
+    }
+    /* Play a silent buffer to fully unlock iOS audio */
+    if (!audioReady) {
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      audioReady = true;
+    }
+  } catch (e) { /* Silently ignore audio initialization errors */ }
 }
 
 /* Initialise audio context on first touch/click */
@@ -1340,24 +1347,27 @@ let lastTickAngle   = 0;
 
 function playTick(intensity) {
   if (isMuted) return;
-  const ac = getAudioCtx();
-  const now = ac.currentTime;
+  try {
+    const ac = getAudioCtx();
+    if (ac.state === 'suspended') return;
+    const now = ac.currentTime;
 
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.connect(gain);
-  gain.connect(ac.destination);
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
 
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(900 + intensity * 400, now);
-  osc.frequency.exponentialRampToValueAtTime(400, now + 0.06);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(900 + intensity * 400, now);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.06);
 
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.18 * Math.min(intensity * 1.6, 1.0), now + 0.004);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.18 * Math.min(intensity * 1.6, 1.0), now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
 
-  osc.start(now);
-  osc.stop(now + 0.08);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  } catch (e) { /* Silently ignore audio errors */ }
 }
 
 function startSpinSound() {
@@ -1391,7 +1401,9 @@ function checkTickOnFrame(angle, speed) {
 /* --- Slip/Reverse whoosh sound --- */
 function playSlipSound(isReverse, totalDur) {
   if (isMuted) return;
+  try {
   const ac = getAudioCtx();
+  if (ac.state === 'suspended') return;
   const now = ac.currentTime;
   const dur = Math.max(1.5, (totalDur || 2000) / 1000);
 
@@ -1523,12 +1535,15 @@ function playSlipSound(isReverse, totalDur) {
   ringG.gain.exponentialRampToValueAtTime(0.0001, now + dur * 0.9);
   ringOsc.start(now);
   ringOsc.stop(now + dur);
+  } catch (e) { /* Silently ignore audio errors in standalone mode */ }
 }
 
 /* --- Result fanfare sound --- */
 function playFanfare() {
   if (isMuted) return;
+  try {
   const ac = getAudioCtx();
+  if (ac.state === 'suspended') return;
   const now = ac.currentTime;
 
   /* Chord: C-E-G-C (triumphant) */
@@ -1591,6 +1606,7 @@ function playFanfare() {
     osc.start(t);
     osc.stop(t + 0.18);
   }
+  } catch (e) { /* Silently ignore audio errors in standalone mode */ }
 }
 
 /* ===========================
@@ -1780,16 +1796,31 @@ function tween(from, to, duration, easeFn, onTick, onDone, stopAtProgress) {
   let prevVal = from;
 
   function frame(now) {
-    const rawP = Math.min((now - t0) / duration, 1);
-    const p    = Math.min(rawP, cutoff);
-    const v    = from + (to - from) * easeFn(p);
-    const speed = v - prevVal;
-    prevVal = v;
-    onTick(v, speed);
-    if (rawP < cutoff) {
-      animFrameId = requestAnimationFrame(frame);
-    } else {
-      onDone(v, speed);
+    try {
+      const rawP = Math.min((now - t0) / duration, 1);
+      const p    = Math.min(rawP, cutoff);
+      const v    = from + (to - from) * easeFn(p);
+      const speed = v - prevVal;
+      prevVal = v;
+      onTick(v, speed);
+      if (rawP < cutoff) {
+        animFrameId = requestAnimationFrame(frame);
+      } else {
+        onDone(v, speed);
+      }
+    } catch (e) {
+      /* Ensure animation continues even if audio or other callbacks throw */
+      console.warn('Tween frame error:', e);
+      const rawP = Math.min((performance.now() - t0) / duration, 1);
+      if (rawP < cutoff) {
+        animFrameId = requestAnimationFrame(frame);
+      } else {
+        try { onDone(from + (to - from) * easeFn(cutoff), 0); } catch(e2) {
+          /* Last resort: force finish spin */
+          isSpinning = false;
+          startBtn.disabled = false;
+        }
+      }
     }
   }
   animFrameId = requestAnimationFrame(frame);
@@ -1805,7 +1836,7 @@ function startSpin() {
   cancelAnimationFrame(animFrameId);
 
   /* Initialise audio context on user gesture */
-  getAudioCtx();
+  try { getAudioCtx(); } catch(e) {}
 
   const n   = state.names.length;
   const seg = (Math.PI * 2) / n;
@@ -2411,26 +2442,13 @@ function updateCheatDot() {
 /* ===========================
    START BUTTON
 =========================== */
-let startBtnTouched = false;
-
-startBtn.addEventListener('touchstart', e => {
-  startBtnTouched = true;
-  warmUpAudio(); /* Unlock audio on touch before spin starts */
-}, { passive: true });
-
-startBtn.addEventListener('touchend', e => {
-  if (startBtnTouched && !startBtn.disabled) {
-    e.preventDefault(); /* Prevent subsequent click event */
-    startBtnTouched = false;
-    startSpin();
-  }
-});
-
 startBtn.addEventListener('click', () => {
-  if (startBtnTouched) { startBtnTouched = false; return; } /* Already handled by touchend */
   warmUpAudio();
   startSpin();
 });
+startBtn.addEventListener('touchstart', e => {
+  warmUpAudio(); /* Unlock audio on touch before spin starts */
+}, { passive: true });
 
 /* ===========================
    PREVENT UNWANTED BROWSER BEHAVIOUR
