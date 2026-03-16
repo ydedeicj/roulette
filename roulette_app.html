@@ -1290,19 +1290,39 @@ muteBtn.addEventListener('click', () => {
 });
 
 /* Lazily create AudioContext on first user interaction */
+let audioReady = false;
 function getAudioCtx() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().then(() => { audioReady = true; });
+  } else {
+    audioReady = true;
   }
   return audioCtx;
 }
 
+/* Wake up audio context — call on ANY user tap so it's ready before spin */
+function warmUpAudio() {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(() => { audioReady = true; });
+  }
+  /* Play a silent buffer to fully unlock iOS audio */
+  if (!audioReady) {
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    audioReady = true;
+  }
+}
+
 /* Initialise audio context on first touch/click */
 function initAudioOnInteraction() {
-  getAudioCtx();
+  warmUpAudio();
   document.removeEventListener('touchstart', initAudioOnInteraction);
   document.removeEventListener('click', initAudioOnInteraction);
 }
@@ -1365,40 +1385,41 @@ function checkTickOnFrame(angle, speed) {
 }
 
 /* --- Slip/Reverse whoosh sound --- */
-function playSlipSound(isReverse) {
+function playSlipSound(isReverse, totalDur) {
   if (isMuted) return;
   const ac = getAudioCtx();
   const now = ac.currentTime;
-  const dur = 0.85;
+  const dur = Math.max(1.5, (totalDur || 2000) / 1000);
 
-  /* === Layer 1: キュキュキュキュイーン — rapid stutter chirps rising/falling === */
-  const stutCount = 6;
-  const stutDur = 0.07;
+  /* === Layer 1: キュキュキュキュ — stuttering chirps that span the whole move === */
+  const stutCount = 10;
+  const stutSpacing = dur * 0.06;
+  const stutDur = 0.1;
   for (let i = 0; i < stutCount; i++) {
-    const t = now + i * 0.055;
+    const t = now + i * stutSpacing;
     const osc = ac.createOscillator();
     const g = ac.createGain();
     osc.connect(g);
     g.connect(ac.destination);
     osc.type = 'square';
-    /* Each chirp sweeps frequency rapidly */
+    const progress = i / stutCount;
     if (isReverse) {
-      osc.frequency.setValueAtTime(800 + i * 300, t);
-      osc.frequency.exponentialRampToValueAtTime(2400 + i * 400, t + stutDur);
+      osc.frequency.setValueAtTime(500 + progress * 2000, t);
+      osc.frequency.exponentialRampToValueAtTime(1500 + progress * 2500, t + stutDur);
     } else {
-      osc.frequency.setValueAtTime(2400 - i * 200, t);
-      osc.frequency.exponentialRampToValueAtTime(600 + i * 100, t + stutDur);
+      osc.frequency.setValueAtTime(2800 - progress * 1800, t);
+      osc.frequency.exponentialRampToValueAtTime(800 - progress * 400, t + stutDur);
     }
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.18, t + 0.008);
+    g.gain.linearRampToValueAtTime(0.14, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + stutDur);
     osc.start(t);
     osc.stop(t + stutDur + 0.01);
   }
 
-  /* === Layer 2: イーン！ — long sweeping tone after stutters === */
-  const sweepStart = now + stutCount * 0.055;
-  const sweepDur = 0.38;
+  /* === Layer 2: キュイーーーン！ — long sweeping tone through entire duration === */
+  const sweepStart = now + 0.15;
+  const sweepDur = dur * 0.75;
   const sweepOsc = ac.createOscillator();
   const sweepG = ac.createGain();
   const sweepFilter = ac.createBiquadFilter();
@@ -1407,30 +1428,31 @@ function playSlipSound(isReverse) {
   sweepG.connect(ac.destination);
   sweepOsc.type = 'sawtooth';
   sweepFilter.type = 'lowpass';
-  sweepFilter.Q.value = 8;
+  sweepFilter.Q.value = 12;
   if (isReverse) {
-    sweepOsc.frequency.setValueAtTime(400, sweepStart);
-    sweepOsc.frequency.exponentialRampToValueAtTime(3200, sweepStart + sweepDur * 0.7);
-    sweepOsc.frequency.exponentialRampToValueAtTime(2800, sweepStart + sweepDur);
-    sweepFilter.frequency.setValueAtTime(1000, sweepStart);
-    sweepFilter.frequency.exponentialRampToValueAtTime(6000, sweepStart + sweepDur);
+    sweepOsc.frequency.setValueAtTime(300, sweepStart);
+    sweepOsc.frequency.exponentialRampToValueAtTime(2400, sweepStart + sweepDur * 0.6);
+    sweepOsc.frequency.exponentialRampToValueAtTime(3800, sweepStart + sweepDur);
+    sweepFilter.frequency.setValueAtTime(600, sweepStart);
+    sweepFilter.frequency.exponentialRampToValueAtTime(8000, sweepStart + sweepDur);
   } else {
-    sweepOsc.frequency.setValueAtTime(3200, sweepStart);
-    sweepOsc.frequency.exponentialRampToValueAtTime(400, sweepStart + sweepDur * 0.7);
-    sweepOsc.frequency.exponentialRampToValueAtTime(300, sweepStart + sweepDur);
-    sweepFilter.frequency.setValueAtTime(6000, sweepStart);
-    sweepFilter.frequency.exponentialRampToValueAtTime(800, sweepStart + sweepDur);
+    sweepOsc.frequency.setValueAtTime(3800, sweepStart);
+    sweepOsc.frequency.exponentialRampToValueAtTime(800, sweepStart + sweepDur * 0.6);
+    sweepOsc.frequency.exponentialRampToValueAtTime(200, sweepStart + sweepDur);
+    sweepFilter.frequency.setValueAtTime(8000, sweepStart);
+    sweepFilter.frequency.exponentialRampToValueAtTime(400, sweepStart + sweepDur);
   }
   sweepG.gain.setValueAtTime(0.0001, sweepStart);
-  sweepG.gain.linearRampToValueAtTime(0.22, sweepStart + 0.02);
-  sweepG.gain.setValueAtTime(0.22, sweepStart + sweepDur * 0.5);
+  sweepG.gain.linearRampToValueAtTime(0.18, sweepStart + 0.03);
+  sweepG.gain.setValueAtTime(0.18, sweepStart + sweepDur * 0.7);
   sweepG.gain.exponentialRampToValueAtTime(0.0001, sweepStart + sweepDur);
   sweepOsc.start(sweepStart);
   sweepOsc.stop(sweepStart + sweepDur + 0.01);
 
-  /* === Layer 3: ジュワジュワジュワ — filtered noise bursts === */
-  const burstCount = 4;
-  const burstDur = 0.1;
+  /* === Layer 3: ジュワジュワジュワ — repeating filtered noise bursts across duration === */
+  const burstCount = 8;
+  const burstDur = 0.12;
+  const burstSpacing = (dur * 0.7) / burstCount;
   const noiseBufLen = Math.ceil(ac.sampleRate * dur);
   const noiseBuf = ac.createBuffer(1, noiseBufLen, ac.sampleRate);
   const noiseData = noiseBuf.getChannelData(0);
@@ -1438,17 +1460,18 @@ function playSlipSound(isReverse) {
     noiseData[i] = (Math.random() * 2 - 1);
   }
   for (let i = 0; i < burstCount; i++) {
-    const t = sweepStart + 0.05 + i * 0.09;
+    const t = now + 0.1 + i * burstSpacing;
     const src = ac.createBufferSource();
     src.buffer = noiseBuf;
     const bf = ac.createBiquadFilter();
     bf.type = 'bandpass';
-    bf.Q.value = 5;
-    bf.frequency.setValueAtTime(1200 + i * 600, t);
-    bf.frequency.exponentialRampToValueAtTime(300 + i * 200, t + burstDur);
+    bf.Q.value = 8;
+    const freqBase = isReverse ? 800 + i * 400 : 3000 - i * 250;
+    bf.frequency.setValueAtTime(freqBase, t);
+    bf.frequency.exponentialRampToValueAtTime(freqBase * 0.3, t + burstDur);
     const bg = ac.createGain();
     bg.gain.setValueAtTime(0.0001, t);
-    bg.gain.linearRampToValueAtTime(0.2, t + 0.01);
+    bg.gain.linearRampToValueAtTime(0.16, t + 0.01);
     bg.gain.exponentialRampToValueAtTime(0.0001, t + burstDur);
     src.connect(bf);
     bf.connect(bg);
@@ -1457,19 +1480,45 @@ function playSlipSound(isReverse) {
     src.stop(t + burstDur + 0.01);
   }
 
-  /* === Layer 4: Metallic ring for cyber feel === */
+  /* === Layer 4: ビヨヨヨーン — wobbling sine for comical mechanical feel === */
+  const wobOsc = ac.createOscillator();
+  const wobG = ac.createGain();
+  const wobLfo = ac.createOscillator();
+  const wobLfoG = ac.createGain();
+  wobLfo.connect(wobLfoG);
+  wobLfoG.connect(wobOsc.frequency);
+  wobOsc.connect(wobG);
+  wobG.connect(ac.destination);
+  wobOsc.type = 'triangle';
+  wobOsc.frequency.setValueAtTime(isReverse ? 600 : 400, now);
+  wobOsc.frequency.exponentialRampToValueAtTime(isReverse ? 1200 : 200, now + dur * 0.8);
+  wobLfo.type = 'sine';
+  wobLfo.frequency.setValueAtTime(12, now);
+  wobLfo.frequency.linearRampToValueAtTime(3, now + dur * 0.8);
+  wobLfoG.gain.setValueAtTime(150, now);
+  wobLfoG.gain.linearRampToValueAtTime(30, now + dur * 0.8);
+  wobG.gain.setValueAtTime(0.0001, now);
+  wobG.gain.linearRampToValueAtTime(0.1, now + 0.05);
+  wobG.gain.setValueAtTime(0.1, now + dur * 0.5);
+  wobG.gain.exponentialRampToValueAtTime(0.0001, now + dur * 0.85);
+  wobOsc.start(now);
+  wobOsc.stop(now + dur);
+  wobLfo.start(now);
+  wobLfo.stop(now + dur);
+
+  /* === Layer 5: Metallic cyber ring === */
   const ringOsc = ac.createOscillator();
   const ringG = ac.createGain();
   ringOsc.connect(ringG);
   ringG.connect(ac.destination);
   ringOsc.type = 'sine';
   ringOsc.frequency.setValueAtTime(isReverse ? 1800 : 1200, now);
-  ringOsc.frequency.exponentialRampToValueAtTime(isReverse ? 3600 : 600, now + dur);
+  ringOsc.frequency.exponentialRampToValueAtTime(isReverse ? 3600 : 600, now + dur * 0.9);
   ringG.gain.setValueAtTime(0.0001, now);
-  ringG.gain.linearRampToValueAtTime(0.06, now + 0.01);
-  ringG.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  ringG.gain.linearRampToValueAtTime(0.05, now + 0.02);
+  ringG.gain.exponentialRampToValueAtTime(0.0001, now + dur * 0.9);
   ringOsc.start(now);
-  ringOsc.stop(now + dur + 0.01);
+  ringOsc.stop(now + dur);
 }
 
 /* --- Result fanfare sound --- */
@@ -1850,10 +1899,10 @@ function startSpin() {
           if (slipDelta > -0.1) slipDelta -= Math.PI * 2;
         }
         const phase2End = phase2Start + slipDelta;
-        const dur2 = 480 + slipCount * 190;
+        const dur2 = 1200 + slipCount * 400;
 
-        /* Play whoosh sound at start of slip */
-        playSlipSound(effect === 'reverse');
+        /* Play slip/reverse sound — pass duration so sound matches motion */
+        playSlipSound(effect === 'reverse', dur2);
 
         tween(
           phase2Start, phase2End, dur2, ease.inOutCubic,
@@ -2351,9 +2400,12 @@ function updateCheatDot() {
 /* ===========================
    START BUTTON
 =========================== */
-startBtn.addEventListener('click', startSpin);
+startBtn.addEventListener('click', () => {
+  warmUpAudio();
+  startSpin();
+});
 startBtn.addEventListener('touchstart', e => {
-  /* Let click fire naturally; just prevent double-fire from iOS */
+  warmUpAudio(); /* Unlock audio on touch before spin starts */
 }, { passive: true });
 
 /* ===========================
