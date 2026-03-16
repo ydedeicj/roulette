@@ -664,15 +664,15 @@ body::after {
   box-shadow: 0 0 10px rgba(0,255,255,0.3);
 }
 
-/* ===== PROBABILITY SLIDERS ===== */
-.prob-slider-row {
+/* ===== PROBABILITY DROPDOWNS ===== */
+.prob-row {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
 }
 
-.prob-slider-lbl {
+.prob-lbl {
   font-size: 13px;
   font-weight: 700;
   width: 46px;
@@ -680,105 +680,58 @@ body::after {
   letter-spacing: 1px;
 }
 
-.prob-slider-lbl.lbl-normal  { color: var(--neon-cyan);   text-shadow: 0 0 6px rgba(0,255,255,0.6); }
-.prob-slider-lbl.lbl-slip    { color: var(--neon-pink);   text-shadow: 0 0 6px rgba(255,0,255,0.6); }
-.prob-slider-lbl.lbl-reverse { color: var(--neon-purple); text-shadow: 0 0 6px rgba(191,0,255,0.6); }
+.prob-lbl.lbl-normal  { color: var(--neon-cyan);   text-shadow: 0 0 6px rgba(0,255,255,0.6); }
+.prob-lbl.lbl-slip    { color: var(--neon-pink);   text-shadow: 0 0 6px rgba(255,0,255,0.6); }
+.prob-lbl.lbl-reverse { color: var(--neon-purple); text-shadow: 0 0 6px rgba(191,0,255,0.6); }
 
-.prob-slider-wrap {
+.prob-select {
   flex: 1;
-  position: relative;
-}
-
-.prob-slider {
+  height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  background: rgba(10,10,30,0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 12px;
   -webkit-appearance: none;
   appearance: none;
-  width: 100%;
-  height: 5px;
-  border-radius: 3px;
-  outline: none;
   cursor: pointer;
-  background: rgba(255,255,255,0.08);
-  border: none;
-  touch-action: pan-x;
-}
-
-.prob-slider.slider-normal {
-  background: linear-gradient(
-    to right,
-    var(--neon-cyan) 0%,
-    var(--neon-cyan) var(--fill, 0%),
-    rgba(0,255,255,0.12) var(--fill, 0%),
-    rgba(0,255,255,0.12) 100%
-  );
-}
-.prob-slider.slider-slip {
-  background: linear-gradient(
-    to right,
-    var(--neon-pink) 0%,
-    var(--neon-pink) var(--fill, 0%),
-    rgba(255,0,255,0.12) var(--fill, 0%),
-    rgba(255,0,255,0.12) 100%
-  );
-}
-.prob-slider.slider-reverse {
-  background: linear-gradient(
-    to right,
-    var(--neon-purple) 0%,
-    var(--neon-purple) var(--fill, 0%),
-    rgba(191,0,255,0.12) var(--fill, 0%),
-    rgba(191,0,255,0.12) 100%
-  );
-}
-
-.prob-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.8);
-  cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s;
-}
-.slider-normal::-webkit-slider-thumb {
-  background: var(--neon-cyan);
-  box-shadow: 0 0 10px var(--neon-cyan);
-}
-.slider-slip::-webkit-slider-thumb {
-  background: var(--neon-pink);
-  box-shadow: 0 0 10px var(--neon-pink);
-}
-.slider-reverse::-webkit-slider-thumb {
-  background: var(--neon-purple);
-  box-shadow: 0 0 10px var(--neon-purple);
-}
-
-.prob-slider::-webkit-slider-thumb:active {
-  transform: scale(1.25);
-}
-
-.prob-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.8);
-  cursor: pointer;
-}
-.slider-normal::-moz-range-thumb  { background: var(--neon-cyan);   box-shadow: 0 0 10px var(--neon-cyan); }
-.slider-slip::-moz-range-thumb    { background: var(--neon-pink);   box-shadow: 0 0 10px var(--neon-pink); }
-.slider-reverse::-moz-range-thumb { background: var(--neon-purple); box-shadow: 0 0 10px var(--neon-purple); }
-
-.prob-pct {
-  font-size: 13px;
-  font-weight: 800;
-  width: 38px;
-  text-align: right;
-  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-align-last: center;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.prob-pct.pct-normal  { color: var(--neon-cyan); }
-.prob-pct.pct-slip    { color: var(--neon-pink); }
-.prob-pct.pct-reverse { color: var(--neon-purple); }
+
+.prob-select:focus {
+  outline: none;
+}
+
+.prob-select.sel-normal {
+  border-color: rgba(0,255,255,0.4);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0,255,255,0.2);
+}
+.prob-select.sel-slip {
+  border-color: rgba(255,0,255,0.4);
+  color: var(--neon-pink);
+  box-shadow: 0 0 8px rgba(255,0,255,0.2);
+}
+.prob-select.sel-reverse {
+  border-color: rgba(191,0,255,0.4);
+  color: var(--neon-purple);
+  box-shadow: 0 0 8px rgba(191,0,255,0.2);
+}
+
+.prob-select.undecided {
+  border-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.4);
+  border-style: dashed;
+}
+
+.prob-select.auto-decided {
+  opacity: 0.7;
+}
 
 #saveBtn {
   width: 100%;
@@ -1167,32 +1120,23 @@ body::after {
         <button id="addNameBtn" aria-label="名前を追加">＋ 追加</button>
       </div>
 
-      <!-- Probability Sliders -->
+      <!-- Probability Dropdowns -->
       <div class="sec">
         <label class="sec-label">演出設定</label>
 
-        <div class="prob-slider-row">
-          <span class="prob-slider-lbl lbl-normal">通常</span>
-          <div class="prob-slider-wrap">
-            <input type="range" id="normalSlider" class="prob-slider slider-normal" min="0" max="100" value="100" aria-label="通常確率">
-          </div>
-          <span class="prob-pct pct-normal" id="normalPct">100%</span>
+        <div class="prob-row">
+          <span class="prob-lbl lbl-normal">通常</span>
+          <select id="normalSel" class="prob-select sel-normal" aria-label="通常確率"></select>
         </div>
 
-        <div class="prob-slider-row">
-          <span class="prob-slider-lbl lbl-slip">滑り</span>
-          <div class="prob-slider-wrap">
-            <input type="range" id="slipSlider" class="prob-slider slider-slip" min="0" max="100" value="0" aria-label="滑り確率">
-          </div>
-          <span class="prob-pct pct-slip" id="slipPct">0%</span>
+        <div class="prob-row">
+          <span class="prob-lbl lbl-slip">滑り</span>
+          <select id="slipSel" class="prob-select sel-slip" aria-label="滑り確率"></select>
         </div>
 
-        <div class="prob-slider-row">
-          <span class="prob-slider-lbl lbl-reverse">戻り</span>
-          <div class="prob-slider-wrap">
-            <input type="range" id="reverseSlider" class="prob-slider slider-reverse" min="0" max="100" value="0" aria-label="戻り確率">
-          </div>
-          <span class="prob-pct pct-reverse" id="reversePct">0%</span>
+        <div class="prob-row">
+          <span class="prob-lbl lbl-reverse">戻り</span>
+          <select id="reverseSel" class="prob-select sel-reverse" aria-label="戻り確率"></select>
         </div>
       </div>
 
@@ -1291,12 +1235,9 @@ const titleInput       = document.getElementById('titleInput');
 const namesList        = document.getElementById('namesList');
 const nameCountLbl     = document.getElementById('nameCountLabel');
 const addNameBtn       = document.getElementById('addNameBtn');
-const normalSlider     = document.getElementById('normalSlider');
-const slipSlider       = document.getElementById('slipSlider');
-const reverseSlider    = document.getElementById('reverseSlider');
-const normalPct        = document.getElementById('normalPct');
-const slipPct          = document.getElementById('slipPct');
-const reversePct       = document.getElementById('reversePct');
+const normalSel        = document.getElementById('normalSel');
+const slipSel          = document.getElementById('slipSel');
+const reverseSel       = document.getElementById('reverseSel');
 const saveBtn          = document.getElementById('saveBtn');
 
 /* Cheat */
@@ -2046,61 +1987,116 @@ function stopConfetti() {
 }
 
 /* ===========================
-   PROBABILITY SLIDERS
+   PROBABILITY DROPDOWNS
 =========================== */
-/* Update slider track fill via CSS custom property */
-function updateSliderFill(slider) {
-  const pct = slider.value + '%';
-  slider.style.setProperty('--fill', pct);
-}
+const probSels = [
+  { key: 'normal',  el: normalSel  },
+  { key: 'slip',    el: slipSel    },
+  { key: 'reverse', el: reverseSel }
+];
 
-/* Linked slider logic: when one moves, distribute remainder proportionally to the others */
-function onSliderInput(movedId) {
-  const sliders = [
-    { id: 'normalSlider',  el: normalSlider,  pctEl: normalPct  },
-    { id: 'slipSlider',    el: slipSlider,    pctEl: slipPct    },
-    { id: 'reverseSlider', el: reverseSlider, pctEl: reversePct }
-  ];
+/* Track which dropdown has been set by the user in this round */
+let probSetOrder = []; /* e.g. ['slip', 'normal'] */
 
-  const moved = sliders.find(s => s.id === movedId);
-  const others = sliders.filter(s => s.id !== movedId);
-
-  const movedVal = parseInt(moved.el.value);
-  const remaining = 100 - movedVal;
-
-  const otherSum = others.reduce((sum, s) => sum + parseInt(s.el.value), 0);
-
-  if (otherSum === 0) {
-    /* Split evenly */
-    const half = Math.floor(remaining / 2);
-    others[0].el.value = half;
-    others[1].el.value = remaining - half;
-  } else {
-    /* Distribute proportionally */
-    let newVals = others.map(s => Math.round(parseInt(s.el.value) / otherSum * remaining));
-    /* Correct rounding so total stays exactly 100 */
-    const diff = remaining - newVals.reduce((a, b) => a + b, 0);
-    newVals[0] += diff;
-    newVals.forEach((v, i) => { others[i].el.value = Math.max(0, v); });
+/* Build <option> list for a dropdown */
+function buildProbOptions(sel, maxVal, currentVal, isUndecided, isAuto) {
+  sel.innerHTML = '';
+  if (isUndecided) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '-- 未設定 --';
+    sel.appendChild(opt);
   }
-
-  /* Clamp all to [0,100] */
-  sliders.forEach(s => {
-    s.el.value = Math.max(0, Math.min(100, parseInt(s.el.value)));
-    updateSliderFill(s.el);
-    s.pctEl.textContent = s.el.value + '%';
-  });
+  for (let v = 0; v <= maxVal; v += 10) {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v + '%';
+    if (v === currentVal && !isUndecided) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (isAuto) {
+    sel.value = currentVal;
+    sel.classList.add('auto-decided');
+    sel.classList.remove('undecided');
+    sel.disabled = true;
+  } else if (isUndecided) {
+    sel.value = '';
+    sel.classList.add('undecided');
+    sel.classList.remove('auto-decided');
+    sel.disabled = false;
+  } else {
+    sel.value = currentVal;
+    sel.classList.remove('undecided', 'auto-decided');
+    sel.disabled = false;
+  }
 }
 
-normalSlider.addEventListener('input', () => onSliderInput('normalSlider'));
-slipSlider.addEventListener('input', () => onSliderInput('slipSlider'));
-reverseSlider.addEventListener('input', () => onSliderInput('reverseSlider'));
+/* Refresh all three dropdowns based on current state */
+function refreshProbDropdowns() {
+  const decided = probSetOrder.length;
 
-/* Initialise slider fills */
-function initSliderFills() {
-  updateSliderFill(normalSlider);
-  updateSliderFill(slipSlider);
-  updateSliderFill(reverseSlider);
+  if (decided === 0) {
+    /* Nothing set yet: all show 0~100% as undecided */
+    probSels.forEach(s => buildProbOptions(s.el, 100, '', true, false));
+  } else if (decided === 1) {
+    const first = probSels.find(s => s.key === probSetOrder[0]);
+    const firstVal = parseInt(first.el.value);
+    const remaining = 100 - firstVal;
+    /* First one is set */
+    buildProbOptions(first.el, 100, firstVal, false, false);
+    /* Other two are undecided with max = remaining */
+    probSels.filter(s => s.key !== probSetOrder[0]).forEach(s => {
+      buildProbOptions(s.el, remaining, '', true, false);
+    });
+  } else if (decided >= 2) {
+    const first = probSels.find(s => s.key === probSetOrder[0]);
+    const second = probSels.find(s => s.key === probSetOrder[1]);
+    const firstVal = parseInt(first.el.value);
+    const secondVal = parseInt(second.el.value);
+    const thirdVal = 100 - firstVal - secondVal;
+    const third = probSels.find(s => s.key !== probSetOrder[0] && s.key !== probSetOrder[1]);
+
+    /* Rebuild first: max = 100 */
+    buildProbOptions(first.el, 100, firstVal, false, false);
+    /* Rebuild second: max = remaining after first */
+    buildProbOptions(second.el, 100 - firstVal, secondVal, false, false);
+    /* Third: auto-decided */
+    buildProbOptions(third.el, thirdVal, thirdVal, false, true);
+  }
+}
+
+/* Handle dropdown change */
+function onProbChange(changedKey) {
+  const sel = probSels.find(s => s.key === changedKey);
+  const val = sel.el.value;
+
+  if (val === '') {
+    /* Switched back to undecided — remove from order */
+    probSetOrder = probSetOrder.filter(k => k !== changedKey);
+  } else {
+    /* Remove this key from order and re-add at end if not first */
+    if (probSetOrder.includes(changedKey)) {
+      /* User changed an already-set dropdown → reset the others */
+      probSetOrder = [changedKey];
+    } else {
+      probSetOrder.push(changedKey);
+    }
+  }
+  refreshProbDropdowns();
+}
+
+normalSel.addEventListener('change', () => onProbChange('normal'));
+slipSel.addEventListener('change', () => onProbChange('slip'));
+reverseSel.addEventListener('change', () => onProbChange('reverse'));
+
+/* Initialise dropdowns (called on settings open) */
+function initProbDropdowns() {
+  /* All three are set from state */
+  probSetOrder = ['normal', 'slip', 'reverse'];
+  buildProbOptions(normalSel, 100, state.normalProb, false, false);
+  buildProbOptions(slipSel, 100 - state.normalProb, state.slipProb, false, false);
+  const revVal = 100 - state.normalProb - state.slipProb;
+  buildProbOptions(reverseSel, revVal, revVal, false, true);
 }
 
 /* ===========================
@@ -2109,18 +2105,8 @@ function initSliderFills() {
 function openSettings() {
   titleInput.value = state.title;
 
-  /* Set slider values from state */
-  normalSlider.value  = state.normalProb;
-  slipSlider.value    = state.slipProb;
-  reverseSlider.value = state.reverseProb;
-
-  normalPct.textContent  = state.normalProb  + '%';
-  slipPct.textContent    = state.slipProb    + '%';
-  reversePct.textContent = state.reverseProb + '%';
-
-  updateSliderFill(normalSlider);
-  updateSliderFill(slipSlider);
-  updateSliderFill(reverseSlider);
+  /* Set dropdown values from state */
+  initProbDropdowns();
 
   buildNamesList();
   settingsOverlay.classList.add('open');
@@ -2204,14 +2190,25 @@ saveBtn.addEventListener('click', () => {
 
   state.names       = newNames;
   state.title       = titleInput.value.trim() || 'ルーレット';
-  state.normalProb  = parseInt(normalSlider.value);
-  state.slipProb    = parseInt(slipSlider.value);
-  state.reverseProb = parseInt(reverseSlider.value);
+  /* Read probability dropdowns */
+  const nVal = normalSel.value;
+  const sVal = slipSel.value;
+  const rVal = reverseSel.value;
 
-  /* Guarantee sum == 100 (rounding safety) */
+  if (nVal === '' || sVal === '' || rVal === '') {
+    alert('演出設定の合計値が100%になるよう設定してください。');
+    return;
+  }
+
+  state.normalProb  = parseInt(nVal);
+  state.slipProb    = parseInt(sVal);
+  state.reverseProb = parseInt(rVal);
+
+  /* Guarantee sum == 100 */
   const probSum = state.normalProb + state.slipProb + state.reverseProb;
   if (probSum !== 100) {
-    state.normalProb = Math.max(0, state.normalProb + (100 - probSum));
+    alert('演出設定の合計値が100%になるよう設定してください。');
+    return;
   }
 
   if (state.cheatTarget >= state.names.length) {
@@ -2379,8 +2376,8 @@ startBtn.addEventListener('touchstart', e => {
    PREVENT UNWANTED BROWSER BEHAVIOUR
 =========================== */
 document.addEventListener('touchmove', e => {
-  /* Allow scrolling & slider interaction inside the settings sheet */
-  if (e.target.closest('.sheet-body') || e.target.closest('.prob-slider')) return;
+  /* Allow scrolling inside the settings sheet */
+  if (e.target.closest('.sheet-body')) return;
   e.preventDefault();
 }, { passive: false });
 
@@ -2408,7 +2405,7 @@ function boot() {
   setupCanvas();
   drawWheel(wheelAngle);
   updateCheatDot();
-  initSliderFills();
+  initProbDropdowns();
 
   /* Ensure canvas is properly sized after first layout */
   requestAnimationFrame(() => {
