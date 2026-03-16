@@ -1567,30 +1567,8 @@ function loadState() {
       state.cheatTarget = Math.min(s.cheatTarget, state.names.length - 1);
     }
 
-    if (fromV2) {
-      /* Migrate: convert slipProb/reverseProb to three-way system */
-      const slip = typeof s.slipProb === 'number' ? Math.min(100, Math.max(0, s.slipProb)) : 0;
-      const rev  = typeof s.reverseProb === 'number' ? Math.min(100, Math.max(0, s.reverseProb)) : 0;
-      const total = slip + rev;
-      if (total > 100) {
-        state.slipProb    = Math.round(slip / total * 100);
-        state.reverseProb = Math.round(rev  / total * 100);
-      } else {
-        state.slipProb    = slip;
-        state.reverseProb = rev;
-      }
-      state.normalProb = 100 - state.slipProb - state.reverseProb;
-    } else {
-      if (typeof s.slipProb    === 'number') state.slipProb    = Math.min(100, Math.max(0, s.slipProb));
-      if (typeof s.reverseProb === 'number') state.reverseProb = Math.min(100, Math.max(0, s.reverseProb));
-      if (typeof s.normalProb  === 'number') state.normalProb  = Math.min(100, Math.max(0, s.normalProb));
-    }
-
-    /* Ensure they sum to 100 */
-    const sum = state.normalProb + state.slipProb + state.reverseProb;
-    if (sum !== 100) {
-      state.normalProb = Math.max(0, 100 - state.slipProb - state.reverseProb);
-    }
+    /* Probability settings are NOT restored — always start at defaults */
+    /* normalProb: 100, slipProb: 0, reverseProb: 0 */
 
   } catch(e) {}
 }
