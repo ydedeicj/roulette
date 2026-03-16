@@ -1,1 +1,2428 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ルーレット">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a1a">
+<title>ルーレット</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --accent: #ff00ff;
+  --neon-pink: #ff00ff;
+  --neon-cyan: #00ffff;
+  --neon-purple: #bf00ff;
+  --neon-blue: #0066ff;
+  --bg-dark: #04040f;
+  --bg-mid: #080818;
+  --bg-card: #0e0e2a;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans',
+               'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+  background: var(--bg-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--safe-top);
+  position: relative;
+}
+
+/* Cyberpunk animated grid */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(ellipse at 20% 30%, rgba(191,0,255,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 70%, rgba(0,255,255,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,0,255,0.06) 0%, transparent 65%);
+  background-size:
+    40px 40px,
+    40px 40px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  animation: gridPulse 6s ease-in-out infinite;
+}
+
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 1.0; }
+}
+
+/* Scan-line overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  animation: scanMove 8s linear infinite;
+}
+
+@keyframes scanMove {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 40px; }
+}
+
+/* Floating neon orbs canvas layer */
+#neonOrbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.neon-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(38px);
+  opacity: 0.18;
+  animation: orbDrift linear infinite;
+}
+
+@keyframes orbDrift {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  33%  { transform: translate(30px, -20px) scale(1.1); }
+  66%  { transform: translate(-20px, 25px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+/* Ensure all children sit above the decorative layer */
+#header, #wheelArea, #bottomArea,
+.overlay, #cheatOverlay, #resultOverlay,
+#confettiCanvas, #lpBar, #muteBtn {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== MUTE BUTTON ===== */
+#muteBtn {
+  position: fixed;
+  top: calc(8px + var(--safe-top));
+  left: 12px;
+  z-index: 600;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(10, 10, 30, 0.82);
+  border: 1.5px solid rgba(0, 255, 255, 0.4);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0,255,255,0.25), inset 0 0 8px rgba(0,255,255,0.08);
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  -webkit-appearance: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+#muteBtn:active {
+  transform: scale(0.9);
+  box-shadow: 0 0 20px rgba(0,255,255,0.5);
+}
+
+/* ===== HEADER ===== */
+#header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px 0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+#appTitle {
+  font-size: clamp(36px, 14vw, 63px);
+  font-weight: 900;
+  letter-spacing: 4px;
+  line-height: 1.1;
+  color: var(--neon-cyan);
+  text-shadow:
+    0 0 8px var(--neon-cyan),
+    0 0 20px var(--neon-cyan),
+    0 0 40px rgba(0,255,255,0.4);
+  animation: titleFlicker 4s ease-in-out infinite;
+}
+
+@keyframes titleFlicker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,255,255,0.4); }
+  92%       { opacity: 1; text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,255,255,0.4); }
+  93%       { opacity: 0.7; text-shadow: 0 0 4px var(--neon-cyan); }
+  94%       { opacity: 1; text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,255,255,0.4); }
+  96%       { opacity: 0.85; }
+  97%       { opacity: 1; }
+}
+
+#settingsBtn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(10, 10, 30, 0.82);
+  border: 1.5px solid rgba(191,0,255,0.5);
+  font-size: 21px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(191,0,255,0.3), inset 0 0 8px rgba(191,0,255,0.1);
+  transition: box-shadow 0.2s, border-color 0.2s;
+  -webkit-appearance: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+#settingsBtn:active {
+  box-shadow: 0 0 22px rgba(191,0,255,0.6);
+  border-color: rgba(191,0,255,0.9);
+}
+
+#settingsBtn .gear-icon {
+  display: inline-block;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#settingsBtn.spinning .gear-icon {
+  transform: rotate(72deg);
+}
+
+/* Cheat active dot */
+#cheatDot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink), 0 0 16px var(--neon-pink);
+  display: none;
+  animation: dotBlink 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dotBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* ===== WHEEL AREA ===== */
+#wheelArea {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px 4px;
+  min-height: 0;
+}
+
+#wheelWrap {
+  position: relative;
+  width: 300px;
+  height: 300px;
+}
+
+/* Neon ring around wheel */
+#wheelWrap::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-dark), var(--bg-dark)),
+    conic-gradient(
+      var(--neon-cyan) 0deg,
+      var(--neon-purple) 120deg,
+      var(--neon-pink) 240deg,
+      var(--neon-cyan) 360deg
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: ringRotate 4s linear infinite;
+  z-index: -1;
+}
+
+@keyframes ringRotate {
+  to { filter: hue-rotate(360deg); }
+}
+
+#wheelWrap::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 20px rgba(0,255,255,0.35),
+    0 0 40px rgba(191,0,255,0.25),
+    0 0 60px rgba(255,0,255,0.15);
+  pointer-events: none;
+  animation: wheelGlow 3s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes wheelGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0,255,255,0.35), 0 0 40px rgba(191,0,255,0.25), 0 0 60px rgba(255,0,255,0.15);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0,255,255,0.55), 0 0 60px rgba(191,0,255,0.4), 0 0 90px rgba(255,0,255,0.25);
+  }
+}
+
+#wheelCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 18px rgba(0,255,255,0.35)) drop-shadow(0 8px 28px rgba(0,0,0,0.55));
+}
+
+/* Pointer triangle */
+#pointer {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 17px solid transparent;
+  border-right: 17px solid transparent;
+  border-top: 40px solid var(--neon-cyan);
+  filter: drop-shadow(0 0 8px var(--neon-cyan)) drop-shadow(0 3px 8px rgba(0,255,255,0.7));
+  z-index: 10;
+}
+
+#pointer::before {
+  content: '';
+  position: absolute;
+  top: -48px;
+  left: -13px;
+  width: 26px;
+  height: 14px;
+  background: var(--neon-purple);
+  border-radius: 5px 5px 0 0;
+  box-shadow: 0 0 8px var(--neon-purple);
+}
+
+/* Center hub */
+#hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, rgba(0,255,255,0.9), rgba(10,10,40,0.95));
+  border: 2.5px solid var(--neon-cyan);
+  box-shadow: 0 0 12px var(--neon-cyan), 0 0 24px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.3);
+  z-index: 11;
+  animation: hubPulse 2s ease-in-out infinite;
+}
+
+@keyframes hubPulse {
+  0%, 100% { box-shadow: 0 0 12px var(--neon-cyan), 0 0 24px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.3); }
+  50%       { box-shadow: 0 0 18px var(--neon-cyan), 0 0 36px rgba(0,255,255,0.6), inset 0 0 14px rgba(0,255,255,0.5); }
+}
+
+/* ===== BOTTOM ===== */
+#bottomArea {
+  width: 100%;
+  max-width: 430px;
+  padding: 6px 16px calc(12px + var(--safe-bottom));
+  flex-shrink: 0;
+}
+
+#startBtn {
+  width: 100%;
+  height: 58px;
+  border-radius: 29px;
+  border: 2px solid var(--neon-pink);
+  background: linear-gradient(135deg, rgba(255,0,255,0.15) 0%, rgba(100,0,200,0.25) 60%, rgba(255,0,255,0.1) 100%);
+  color: var(--neon-pink);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  cursor: pointer;
+  box-shadow:
+    0 0 16px rgba(255,0,255,0.5),
+    0 0 32px rgba(255,0,255,0.25),
+    inset 0 0 20px rgba(255,0,255,0.08);
+  -webkit-appearance: none;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  text-shadow: 0 0 10px var(--neon-pink), 0 0 20px rgba(255,0,255,0.6);
+}
+
+#startBtn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: btnGleam 2.8s 1s infinite;
+}
+
+@keyframes btnGleam {
+  0% { left: -120%; }
+  35%, 100% { left: 140%; }
+}
+
+#startBtn:active:not(:disabled) {
+  transform: scale(0.962);
+  box-shadow: 0 0 28px rgba(255,0,255,0.8), 0 0 56px rgba(255,0,255,0.4);
+  border-color: #fff;
+}
+
+#startBtn:disabled {
+  background: rgba(30,30,50,0.6);
+  border-color: rgba(100,100,150,0.4);
+  color: rgba(150,150,200,0.5);
+  box-shadow: none;
+  text-shadow: none;
+  cursor: default;
+}
+
+/* ===== MODALS BASE ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0,0,10,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.overlay.open {
+  opacity: 1;
+  pointer-events: all;
+  touch-action: pan-y;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 90dvh;
+  max-height: 90vh;
+  background: linear-gradient(160deg, #0c0c22 0%, #10102e 60%, #0a0a1e 100%);
+  border-radius: 22px 22px 0 0;
+  padding-bottom: calc(20px + var(--safe-bottom));
+  border-top: 1.5px solid rgba(0,255,255,0.25);
+  border-left: 1px solid rgba(191,0,255,0.15);
+  border-right: 1px solid rgba(191,0,255,0.15);
+  box-shadow: 0 -8px 40px rgba(0,255,255,0.12), 0 -4px 20px rgba(191,0,255,0.1);
+  transform: translateY(102%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.overlay.open .sheet {
+  transform: translateY(0);
+}
+
+.sheet-handle {
+  width: 38px;
+  height: 5px;
+  background: rgba(0,255,255,0.35);
+  border-radius: 3px;
+  margin: 11px auto 6px;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(0,255,255,0.4);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 18px 12px;
+  border-bottom: 1px solid rgba(0,255,255,0.12);
+  flex-shrink: 0;
+}
+
+.sheet-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0,255,255,0.5);
+  letter-spacing: 2px;
+}
+
+.sheet-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255,0,255,0.12);
+  border: 1px solid rgba(255,0,255,0.35);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neon-pink);
+  -webkit-appearance: none;
+  box-shadow: 0 0 8px rgba(255,0,255,0.25);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.sheet-close:active {
+  background: rgba(255,0,255,0.25);
+  box-shadow: 0 0 16px rgba(255,0,255,0.5);
+}
+
+.sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding: 16px 18px 4px;
+}
+
+/* ===== SETTINGS STYLES ===== */
+.sec-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 9px;
+  display: block;
+  text-shadow: 0 0 6px rgba(0,255,255,0.4);
+}
+
+.sec {
+  margin-bottom: 22px;
+}
+
+.field-input {
+  width: 100%;
+  height: 44px;
+  border-radius: 11px;
+  border: 1.5px solid rgba(0,255,255,0.25);
+  padding: 0 13px;
+  font-size: 16px;
+  color: #e0e8ff;
+  background: rgba(0,10,30,0.7);
+  outline: none;
+  -webkit-appearance: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.field-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 12px rgba(0,255,255,0.3);
+  background: rgba(0,15,40,0.85);
+}
+
+#nameCountLabel {
+  font-size: 12.5px;
+  color: rgba(0,255,255,0.5);
+  margin-bottom: 9px;
+}
+
+#namesList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.color-pip {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+}
+
+.name-field {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,255,255,0.2);
+  padding: 0 11px;
+  font-size: 15px;
+  color: #d0d8f0;
+  background: rgba(0,8,25,0.65);
+  outline: none;
+  -webkit-appearance: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.name-field:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0,255,255,0.25);
+  background: rgba(0,12,35,0.85);
+}
+
+.del-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,0,80,0.12);
+  border: 1px solid rgba(255,0,80,0.35);
+  color: #ff4060;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-appearance: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.del-btn:active {
+  background: rgba(255,0,80,0.28);
+  box-shadow: 0 0 10px rgba(255,0,80,0.5);
+}
+
+#addNameBtn {
+  margin-top: 10px;
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px dashed rgba(0,255,255,0.3);
+  background: transparent;
+  color: rgba(0,255,255,0.55);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  transition: border-color 0.18s, color 0.18s, box-shadow 0.18s;
+}
+
+#addNameBtn:active {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0,255,255,0.3);
+}
+
+/* ===== PROBABILITY SLIDERS ===== */
+.prob-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.prob-slider-lbl {
+  font-size: 13px;
+  font-weight: 700;
+  width: 46px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+.prob-slider-lbl.lbl-normal  { color: var(--neon-cyan);   text-shadow: 0 0 6px rgba(0,255,255,0.6); }
+.prob-slider-lbl.lbl-slip    { color: var(--neon-pink);   text-shadow: 0 0 6px rgba(255,0,255,0.6); }
+.prob-slider-lbl.lbl-reverse { color: var(--neon-purple); text-shadow: 0 0 6px rgba(191,0,255,0.6); }
+
+.prob-slider-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.prob-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  background: rgba(255,255,255,0.08);
+  border: none;
+}
+
+.prob-slider.slider-normal {
+  background: linear-gradient(
+    to right,
+    var(--neon-cyan) 0%,
+    var(--neon-cyan) var(--fill, 0%),
+    rgba(0,255,255,0.12) var(--fill, 0%),
+    rgba(0,255,255,0.12) 100%
+  );
+}
+.prob-slider.slider-slip {
+  background: linear-gradient(
+    to right,
+    var(--neon-pink) 0%,
+    var(--neon-pink) var(--fill, 0%),
+    rgba(255,0,255,0.12) var(--fill, 0%),
+    rgba(255,0,255,0.12) 100%
+  );
+}
+.prob-slider.slider-reverse {
+  background: linear-gradient(
+    to right,
+    var(--neon-purple) 0%,
+    var(--neon-purple) var(--fill, 0%),
+    rgba(191,0,255,0.12) var(--fill, 0%),
+    rgba(191,0,255,0.12) 100%
+  );
+}
+
+.prob-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.slider-normal::-webkit-slider-thumb {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+}
+.slider-slip::-webkit-slider-thumb {
+  background: var(--neon-pink);
+  box-shadow: 0 0 10px var(--neon-pink);
+}
+.slider-reverse::-webkit-slider-thumb {
+  background: var(--neon-purple);
+  box-shadow: 0 0 10px var(--neon-purple);
+}
+
+.prob-slider::-webkit-slider-thumb:active {
+  transform: scale(1.25);
+}
+
+.prob-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  cursor: pointer;
+}
+.slider-normal::-moz-range-thumb  { background: var(--neon-cyan);   box-shadow: 0 0 10px var(--neon-cyan); }
+.slider-slip::-moz-range-thumb    { background: var(--neon-pink);   box-shadow: 0 0 10px var(--neon-pink); }
+.slider-reverse::-moz-range-thumb { background: var(--neon-purple); box-shadow: 0 0 10px var(--neon-purple); }
+
+.prob-pct {
+  font-size: 13px;
+  font-weight: 800;
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.prob-pct.pct-normal  { color: var(--neon-cyan); }
+.prob-pct.pct-slip    { color: var(--neon-pink); }
+.prob-pct.pct-reverse { color: var(--neon-purple); }
+
+#saveBtn {
+  width: 100%;
+  height: 50px;
+  border-radius: 25px;
+  border: 2px solid var(--neon-cyan);
+  background: linear-gradient(135deg, rgba(0,255,255,0.12), rgba(0,80,200,0.2));
+  color: var(--neon-cyan);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(0,255,255,0.4), inset 0 0 16px rgba(0,255,255,0.06);
+  -webkit-appearance: none;
+  transition: transform 0.12s, box-shadow 0.12s;
+  margin-top: 6px;
+  text-shadow: 0 0 8px rgba(0,255,255,0.6);
+}
+
+#saveBtn:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 28px rgba(0,255,255,0.7);
+}
+
+/* ===== CHEAT PANEL ===== */
+#cheatOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0,0,10,0.82);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+#cheatOverlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#cheatSheet {
+  width: 100%;
+  background: linear-gradient(160deg, #12122a 0%, #1a1f3e 60%, #0d2f50 100%);
+  border-radius: 22px 22px 0 0;
+  border-top: 1.5px solid rgba(255,0,255,0.3);
+  box-shadow: 0 -8px 40px rgba(255,0,255,0.15);
+  padding: 0 20px calc(24px + var(--safe-bottom));
+  transform: translateY(102%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow: hidden;
+}
+
+#cheatOverlay.open #cheatSheet {
+  transform: translateY(0);
+}
+
+.cheat-handle {
+  width: 36px;
+  height: 5px;
+  background: rgba(255,0,255,0.4);
+  border-radius: 3px;
+  margin: 12px auto 18px;
+  box-shadow: 0 0 8px rgba(255,0,255,0.4);
+}
+
+.cheat-dots {
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255,0,255,0.35);
+  letter-spacing: 5px;
+  margin-bottom: 20px;
+}
+
+.cheat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cheat-lbl {
+  font-size: 14px;
+  color: #c0b8e0;
+  font-weight: 600;
+}
+
+/* Toggle */
+.toggle {
+  position: relative;
+  width: 52px;
+  height: 29px;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #2a1a3a;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: background 0.28s;
+  border: 1px solid rgba(255,0,255,0.2);
+}
+
+.toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 23px;
+  height: 23px;
+  left: 3px;
+  top: 3px;
+  background: #888;
+  border-radius: 50%;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.toggle input:checked + .toggle-track {
+  background: linear-gradient(135deg, rgba(255,0,80,0.4), rgba(150,0,50,0.5));
+  border-color: rgba(255,0,80,0.6);
+  box-shadow: 0 0 10px rgba(255,0,80,0.4);
+}
+
+.toggle input:checked + .toggle-track::before {
+  transform: translateX(23px);
+  background: #ff0040;
+  box-shadow: 0 0 8px rgba(255,0,64,0.8);
+}
+
+#cheatTargetWrap {
+  display: none;
+  margin-bottom: 18px;
+}
+
+#cheatTargetWrap.show {
+  display: block;
+}
+
+.cheat-sel-lbl {
+  font-size: 12px;
+  color: rgba(191,0,255,0.7);
+  margin-bottom: 7px;
+  display: block;
+  letter-spacing: 1px;
+}
+
+#cheatTargetSel {
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(191,0,255,0.4);
+  background: rgba(10,5,30,0.85);
+  color: #d0c0f0;
+  font-size: 15px;
+  padding: 0 12px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23bf00ff' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  box-shadow: 0 0 10px rgba(191,0,255,0.2);
+}
+
+#cheatCloseBtn {
+  width: 100%;
+  height: 42px;
+  border-radius: 21px;
+  border: 1.5px solid rgba(191,0,255,0.3);
+  background: transparent;
+  color: rgba(191,0,255,0.6);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  margin-top: 2px;
+  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+#cheatCloseBtn:active {
+  border-color: var(--neon-purple);
+  color: var(--neon-purple);
+  box-shadow: 0 0 12px rgba(191,0,255,0.4);
+}
+
+/* ===== RESULT POPUP ===== */
+#resultOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,10,0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+#resultOverlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#resultCard {
+  background: linear-gradient(160deg, #0e0e2a 0%, #151530 60%, #0a0a20 100%);
+  border-radius: 26px;
+  padding: 34px 38px 28px;
+  text-align: center;
+  width: 82%;
+  max-width: 310px;
+  border: 1.5px solid rgba(0,255,255,0.25);
+  box-shadow:
+    0 0 30px rgba(0,255,255,0.2),
+    0 0 60px rgba(191,0,255,0.15),
+    0 24px 64px rgba(0,0,0,0.6);
+  transform: scale(0.45) translateY(50px);
+  transition: transform 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+#resultOverlay.open #resultCard {
+  transform: scale(1) translateY(0);
+}
+
+#resultCard::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-pink));
+  border-radius: 26px 26px 0 0;
+  animation: resultTopBar 2s linear infinite;
+}
+
+@keyframes resultTopBar {
+  to { filter: hue-rotate(360deg); }
+}
+
+#resultEmoji {
+  font-size: 54px;
+  line-height: 1;
+  margin-bottom: 10px;
+  display: block;
+  animation: popIn 0.5s 0.25s both cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  from { transform: scale(0) rotate(-20deg); }
+  to   { transform: scale(1) rotate(0deg); }
+}
+
+#resultName {
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-bottom: 24px;
+  word-break: break-all;
+  color: var(--result-color, #00ffff);
+  text-shadow: 0 0 12px var(--result-color, #00ffff), 0 0 24px rgba(0,255,255,0.4);
+}
+
+#resultOkBtn {
+  width: 100%;
+  height: 48px;
+  border-radius: 24px;
+  border: 2px solid var(--neon-cyan);
+  background: linear-gradient(135deg, rgba(0,255,255,0.1), rgba(0,100,200,0.18));
+  color: var(--neon-cyan);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0,255,255,0.4);
+  -webkit-appearance: none;
+  transition: transform 0.12s, box-shadow 0.12s;
+  text-shadow: 0 0 8px rgba(0,255,255,0.6);
+  letter-spacing: 2px;
+}
+
+#resultOkBtn:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 26px rgba(0,255,255,0.7);
+}
+
+/* ===== CONFETTI ===== */
+#confettiCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 350;
+  display: none;
+}
+
+/* ===== LONG PRESS BAR ===== */
+#lpBar {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+  z-index: 500;
+  display: none;
+}
+
+#lpBarFill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-pink));
+  border-radius: 0 3px 3px 0;
+  transition: width 3s linear;
+  box-shadow: 0 0 6px rgba(255,0,255,0.6);
+}
+</style>
+</head>
+<body>
+
+<!-- Neon floating orbs -->
+<div id="neonOrbs" aria-hidden="true">
+  <div class="neon-orb" style="width:220px;height:220px;top:5%;left:8%;background:radial-gradient(circle,#bf00ff,transparent);animation-duration:18s;animation-delay:-3s;"></div>
+  <div class="neon-orb" style="width:180px;height:180px;top:55%;left:70%;background:radial-gradient(circle,#00ffff,transparent);animation-duration:14s;animation-delay:-7s;"></div>
+  <div class="neon-orb" style="width:150px;height:150px;top:75%;left:20%;background:radial-gradient(circle,#ff00ff,transparent);animation-duration:22s;animation-delay:-11s;"></div>
+  <div class="neon-orb" style="width:120px;height:120px;top:30%;left:80%;background:radial-gradient(circle,#0066ff,transparent);animation-duration:16s;animation-delay:-5s;"></div>
+</div>
+
+<!-- Long press bar -->
+<div id="lpBar"><div id="lpBarFill"></div></div>
+
+<!-- Mute Button -->
+<button id="muteBtn" aria-label="ミュート切替" title="ミュート切替">🔊</button>
+
+<!-- Header -->
+<header id="header">
+  <span id="appTitle">ルーレット</span>
+  <button id="settingsBtn" aria-label="設定">
+    <span class="gear-icon">⚙️</span>
+    <span id="cheatDot" aria-hidden="true"></span>
+  </button>
+</header>
+
+<!-- Wheel -->
+<section id="wheelArea">
+  <div id="wheelWrap">
+    <div id="pointer" aria-hidden="true"></div>
+    <canvas id="wheelCanvas" aria-label="ルーレットホイール"></canvas>
+    <div id="hub" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- Start Button -->
+<div id="bottomArea">
+  <button id="startBtn" aria-label="スタート">スタート</button>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="設定パネル">
+  <div class="sheet" role="document">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">設定</span>
+      <button class="sheet-close" id="settingsCloseBtn" aria-label="閉じる">✕</button>
+    </div>
+    <div class="sheet-body">
+
+      <!-- Title -->
+      <div class="sec">
+        <label class="sec-label" for="titleInput">タイトル</label>
+        <input type="text" id="titleInput" class="field-input" placeholder="ルーレット" maxlength="20" autocomplete="off">
+      </div>
+
+      <!-- Names -->
+      <div class="sec">
+        <label class="sec-label">参加者リスト</label>
+        <div id="nameCountLabel">人数: 0/20</div>
+        <div id="namesList" role="list"></div>
+        <button id="addNameBtn" aria-label="名前を追加">＋ 追加</button>
+      </div>
+
+      <!-- Probability Sliders -->
+      <div class="sec">
+        <label class="sec-label">演出設定</label>
+
+        <div class="prob-slider-row">
+          <span class="prob-slider-lbl lbl-normal">通常</span>
+          <div class="prob-slider-wrap">
+            <input type="range" id="normalSlider" class="prob-slider slider-normal" min="0" max="100" value="100" aria-label="通常確率">
+          </div>
+          <span class="prob-pct pct-normal" id="normalPct">100%</span>
+        </div>
+
+        <div class="prob-slider-row">
+          <span class="prob-slider-lbl lbl-slip">滑り</span>
+          <div class="prob-slider-wrap">
+            <input type="range" id="slipSlider" class="prob-slider slider-slip" min="0" max="100" value="0" aria-label="滑り確率">
+          </div>
+          <span class="prob-pct pct-slip" id="slipPct">0%</span>
+        </div>
+
+        <div class="prob-slider-row">
+          <span class="prob-slider-lbl lbl-reverse">戻り</span>
+          <div class="prob-slider-wrap">
+            <input type="range" id="reverseSlider" class="prob-slider slider-reverse" min="0" max="100" value="0" aria-label="戻り確率">
+          </div>
+          <span class="prob-pct pct-reverse" id="reversePct">0%</span>
+        </div>
+      </div>
+
+      <button id="saveBtn">設定を保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cheat Panel (SECRET) -->
+<div id="cheatOverlay">
+  <div id="cheatSheet">
+    <div class="cheat-handle"></div>
+    <div class="cheat-dots">● ● ●</div>
+
+    <div class="cheat-row">
+      <span class="cheat-lbl">スーパーイカサマモード</span>
+      <label class="toggle" aria-label="イカサマモード切替">
+        <input type="checkbox" id="cheatToggle" role="switch">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div id="cheatTargetWrap">
+      <span class="cheat-sel-lbl">ターゲット</span>
+      <select id="cheatTargetSel" aria-label="ターゲット選択"></select>
+    </div>
+
+    <button id="cheatCloseBtn" aria-label="閉じる">閉じる</button>
+  </div>
+</div>
+
+<!-- Confetti -->
+<canvas id="confettiCanvas" aria-hidden="true"></canvas>
+
+<!-- Result Popup -->
+<div id="resultOverlay" role="alertdialog" aria-modal="true" aria-label="結果">
+  <div id="resultCard">
+    <span id="resultEmoji" aria-hidden="true">🎉</span>
+    <div id="resultName" aria-live="polite">—</div>
+    <button id="resultOkBtn">OK</button>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ===========================
+   CONSTANTS
+=========================== */
+const COLORS = [
+  '#e8001e', '#1a5cff', '#00b84a', '#f5b800',
+  '#ff6200', '#8b00e8', '#00b8d4', '#e8007c',
+  '#7dc800', '#ff4499', '#009980', '#ff5555',
+  '#4040e8', '#d4800a', '#b30010', '#0032b0',
+  '#007a2a', '#6600b0', '#aa0015', '#b07800'
+];
+
+const EMOJIS = ['🎉','🎊','✨','🌟','🎯','🏆','🎈','🥳','🎁','💥'];
+
+const LONG_PRESS_MS = 3000;
+
+/* ===========================
+   STATE
+=========================== */
+let state = {
+  title: 'ルーレット',
+  names: ['田中', '鈴木', '佐藤', '山田', '伊藤'],
+  normalProb: 100,
+  slipProb: 0,
+  reverseProb: 0,
+  cheatEnabled: false,
+  cheatTarget: 0
+};
+
+/* Wheel rotation (accumulated radians — grows forever) */
+let wheelAngle = 0;
+let isSpinning = false;
+let animFrameId = null;
+
+/* ===========================
+   ELEMENTS
+=========================== */
+const canvas       = document.getElementById('wheelCanvas');
+const ctx          = canvas.getContext('2d');
+const appTitleEl   = document.getElementById('appTitle');
+const startBtn     = document.getElementById('startBtn');
+const settingsBtn  = document.getElementById('settingsBtn');
+const cheatDot     = document.getElementById('cheatDot');
+const muteBtn      = document.getElementById('muteBtn');
+
+/* Settings */
+const settingsOverlay  = document.getElementById('settingsOverlay');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+const titleInput       = document.getElementById('titleInput');
+const namesList        = document.getElementById('namesList');
+const nameCountLbl     = document.getElementById('nameCountLabel');
+const addNameBtn       = document.getElementById('addNameBtn');
+const normalSlider     = document.getElementById('normalSlider');
+const slipSlider       = document.getElementById('slipSlider');
+const reverseSlider    = document.getElementById('reverseSlider');
+const normalPct        = document.getElementById('normalPct');
+const slipPct          = document.getElementById('slipPct');
+const reversePct       = document.getElementById('reversePct');
+const saveBtn          = document.getElementById('saveBtn');
+
+/* Cheat */
+const cheatOverlay    = document.getElementById('cheatOverlay');
+const cheatSheet      = document.getElementById('cheatSheet');
+const cheatToggle     = document.getElementById('cheatToggle');
+const cheatTargetWrap = document.getElementById('cheatTargetWrap');
+const cheatTargetSel  = document.getElementById('cheatTargetSel');
+const cheatCloseBtn   = document.getElementById('cheatCloseBtn');
+
+/* Result */
+const resultOverlay = document.getElementById('resultOverlay');
+const resultCard    = document.getElementById('resultCard');
+const resultEmoji   = document.getElementById('resultEmoji');
+const resultName    = document.getElementById('resultName');
+const resultOkBtn   = document.getElementById('resultOkBtn');
+
+/* Confetti */
+const confettiCanvas = document.getElementById('confettiCanvas');
+const cctx = confettiCanvas.getContext('2d');
+
+/* Long press bar */
+const lpBar     = document.getElementById('lpBar');
+const lpBarFill = document.getElementById('lpBarFill');
+
+/* ===========================
+   WEB AUDIO API
+=========================== */
+let audioCtx = null;
+let isMuted = false;
+
+/* Load mute state from localStorage */
+try {
+  const savedMute = localStorage.getItem('rlt_muted');
+  if (savedMute !== null) isMuted = savedMute === 'true';
+} catch(e) {}
+
+function updateMuteBtn() {
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.setAttribute('aria-label', isMuted ? 'ミュート解除' : 'ミュート');
+}
+updateMuteBtn();
+
+muteBtn.addEventListener('click', () => {
+  isMuted = !isMuted;
+  try { localStorage.setItem('rlt_muted', String(isMuted)); } catch(e) {}
+  updateMuteBtn();
+  /* Stop spinning sound immediately if muted */
+  if (isMuted) stopSpinSound();
+});
+
+/* Lazily create AudioContext on first user interaction */
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+/* Initialise audio context on first touch/click */
+function initAudioOnInteraction() {
+  getAudioCtx();
+  document.removeEventListener('touchstart', initAudioOnInteraction);
+  document.removeEventListener('click', initAudioOnInteraction);
+}
+document.addEventListener('touchstart', initAudioOnInteraction, { passive: true });
+document.addEventListener('click', initAudioOnInteraction, { once: true });
+
+/* --- Spinning tick sound --- */
+let spinSoundActive = false;
+let spinTickTimeout = null;
+let lastTickAngle   = 0;
+
+function playTick(intensity) {
+  if (isMuted) return;
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(900 + intensity * 400, now);
+  osc.frequency.exponentialRampToValueAtTime(400, now + 0.06);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.18 * Math.min(intensity * 1.6, 1.0), now + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+
+  osc.start(now);
+  osc.stop(now + 0.08);
+}
+
+function startSpinSound() {
+  spinSoundActive = true;
+}
+
+function stopSpinSound() {
+  spinSoundActive = false;
+  if (spinTickTimeout) {
+    clearTimeout(spinTickTimeout);
+    spinTickTimeout = null;
+  }
+}
+
+/* Called each animation frame during spin — checks if wheel crossed a segment boundary */
+let prevSegIdx = -1;
+function checkTickOnFrame(angle, speed) {
+  if (!spinSoundActive || isMuted) return;
+  const n = state.names.length;
+  if (n < 1) return;
+  const seg = (Math.PI * 2) / n;
+  const curIdx = Math.floor(((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / seg);
+  if (curIdx !== prevSegIdx) {
+    prevSegIdx = curIdx;
+    /* intensity based on speed (radians/frame * 60) — normalise 0..1 */
+    const intensity = Math.min(Math.abs(speed) / 0.22, 1);
+    playTick(intensity);
+  }
+}
+
+/* --- Slip/Reverse whoosh sound --- */
+function playSlipSound(isReverse) {
+  if (isMuted) return;
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+  const dur = 0.85;
+
+  /* === Layer 1: キュキュキュキュイーン — rapid stutter chirps rising/falling === */
+  const stutCount = 6;
+  const stutDur = 0.07;
+  for (let i = 0; i < stutCount; i++) {
+    const t = now + i * 0.055;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.connect(g);
+    g.connect(ac.destination);
+    osc.type = 'square';
+    /* Each chirp sweeps frequency rapidly */
+    if (isReverse) {
+      osc.frequency.setValueAtTime(800 + i * 300, t);
+      osc.frequency.exponentialRampToValueAtTime(2400 + i * 400, t + stutDur);
+    } else {
+      osc.frequency.setValueAtTime(2400 - i * 200, t);
+      osc.frequency.exponentialRampToValueAtTime(600 + i * 100, t + stutDur);
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + stutDur);
+    osc.start(t);
+    osc.stop(t + stutDur + 0.01);
+  }
+
+  /* === Layer 2: イーン！ — long sweeping tone after stutters === */
+  const sweepStart = now + stutCount * 0.055;
+  const sweepDur = 0.38;
+  const sweepOsc = ac.createOscillator();
+  const sweepG = ac.createGain();
+  const sweepFilter = ac.createBiquadFilter();
+  sweepOsc.connect(sweepFilter);
+  sweepFilter.connect(sweepG);
+  sweepG.connect(ac.destination);
+  sweepOsc.type = 'sawtooth';
+  sweepFilter.type = 'lowpass';
+  sweepFilter.Q.value = 8;
+  if (isReverse) {
+    sweepOsc.frequency.setValueAtTime(400, sweepStart);
+    sweepOsc.frequency.exponentialRampToValueAtTime(3200, sweepStart + sweepDur * 0.7);
+    sweepOsc.frequency.exponentialRampToValueAtTime(2800, sweepStart + sweepDur);
+    sweepFilter.frequency.setValueAtTime(1000, sweepStart);
+    sweepFilter.frequency.exponentialRampToValueAtTime(6000, sweepStart + sweepDur);
+  } else {
+    sweepOsc.frequency.setValueAtTime(3200, sweepStart);
+    sweepOsc.frequency.exponentialRampToValueAtTime(400, sweepStart + sweepDur * 0.7);
+    sweepOsc.frequency.exponentialRampToValueAtTime(300, sweepStart + sweepDur);
+    sweepFilter.frequency.setValueAtTime(6000, sweepStart);
+    sweepFilter.frequency.exponentialRampToValueAtTime(800, sweepStart + sweepDur);
+  }
+  sweepG.gain.setValueAtTime(0.0001, sweepStart);
+  sweepG.gain.linearRampToValueAtTime(0.22, sweepStart + 0.02);
+  sweepG.gain.setValueAtTime(0.22, sweepStart + sweepDur * 0.5);
+  sweepG.gain.exponentialRampToValueAtTime(0.0001, sweepStart + sweepDur);
+  sweepOsc.start(sweepStart);
+  sweepOsc.stop(sweepStart + sweepDur + 0.01);
+
+  /* === Layer 3: ジュワジュワジュワ — filtered noise bursts === */
+  const burstCount = 4;
+  const burstDur = 0.1;
+  const noiseBufLen = Math.ceil(ac.sampleRate * dur);
+  const noiseBuf = ac.createBuffer(1, noiseBufLen, ac.sampleRate);
+  const noiseData = noiseBuf.getChannelData(0);
+  for (let i = 0; i < noiseBufLen; i++) {
+    noiseData[i] = (Math.random() * 2 - 1);
+  }
+  for (let i = 0; i < burstCount; i++) {
+    const t = sweepStart + 0.05 + i * 0.09;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    const bf = ac.createBiquadFilter();
+    bf.type = 'bandpass';
+    bf.Q.value = 5;
+    bf.frequency.setValueAtTime(1200 + i * 600, t);
+    bf.frequency.exponentialRampToValueAtTime(300 + i * 200, t + burstDur);
+    const bg = ac.createGain();
+    bg.gain.setValueAtTime(0.0001, t);
+    bg.gain.linearRampToValueAtTime(0.2, t + 0.01);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + burstDur);
+    src.connect(bf);
+    bf.connect(bg);
+    bg.connect(ac.destination);
+    src.start(t);
+    src.stop(t + burstDur + 0.01);
+  }
+
+  /* === Layer 4: Metallic ring for cyber feel === */
+  const ringOsc = ac.createOscillator();
+  const ringG = ac.createGain();
+  ringOsc.connect(ringG);
+  ringG.connect(ac.destination);
+  ringOsc.type = 'sine';
+  ringOsc.frequency.setValueAtTime(isReverse ? 1800 : 1200, now);
+  ringOsc.frequency.exponentialRampToValueAtTime(isReverse ? 3600 : 600, now + dur);
+  ringG.gain.setValueAtTime(0.0001, now);
+  ringG.gain.linearRampToValueAtTime(0.06, now + 0.01);
+  ringG.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  ringOsc.start(now);
+  ringOsc.stop(now + dur + 0.01);
+}
+
+/* --- Result fanfare sound --- */
+function playFanfare() {
+  if (isMuted) return;
+  const ac = getAudioCtx();
+  const now = ac.currentTime;
+
+  /* Chord: C-E-G-C (triumphant) */
+  const notes = [261.63, 329.63, 392.00, 523.25];
+  const timings = [0, 0.08, 0.16, 0.24];
+
+  notes.forEach((freq, i) => {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+
+    const t = now + timings[i];
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+
+    osc.start(t);
+    osc.stop(t + 0.75);
+  });
+
+  /* Second wave: arpeggio up */
+  const arp = [523.25, 659.26, 783.99, 1046.50];
+  arp.forEach((freq, i) => {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    const t = now + 0.38 + i * 0.07;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+
+    osc.start(t);
+    osc.stop(t + 0.32);
+  });
+
+  /* Sparkle: high-frequency shimmer */
+  for (let i = 0; i < 6; i++) {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.type = 'sine';
+    osc.frequency.value = 2000 + Math.random() * 2000;
+
+    const t = now + 0.2 + i * 0.09;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.05, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+}
+
+/* ===========================
+   PERSIST
+=========================== */
+function loadState() {
+  try {
+    /* Try rlt_v3 first */
+    let raw = localStorage.getItem('rlt_v3');
+    let fromV2 = false;
+
+    if (!raw) {
+      /* Migration: try rlt_v2 */
+      raw = localStorage.getItem('rlt_v2');
+      if (raw) fromV2 = true;
+    }
+
+    if (!raw) return;
+    const s = JSON.parse(raw);
+
+    if (Array.isArray(s.names) && s.names.length >= 2) {
+      state.names = s.names.slice(0, 20);
+    }
+    if (typeof s.title === 'string') state.title = s.title;
+    if (typeof s.cheatEnabled === 'boolean') state.cheatEnabled = s.cheatEnabled;
+    if (typeof s.cheatTarget === 'number') {
+      state.cheatTarget = Math.min(s.cheatTarget, state.names.length - 1);
+    }
+
+    if (fromV2) {
+      /* Migrate: convert slipProb/reverseProb to three-way system */
+      const slip = typeof s.slipProb === 'number' ? Math.min(100, Math.max(0, s.slipProb)) : 0;
+      const rev  = typeof s.reverseProb === 'number' ? Math.min(100, Math.max(0, s.reverseProb)) : 0;
+      const total = slip + rev;
+      if (total > 100) {
+        state.slipProb    = Math.round(slip / total * 100);
+        state.reverseProb = Math.round(rev  / total * 100);
+      } else {
+        state.slipProb    = slip;
+        state.reverseProb = rev;
+      }
+      state.normalProb = 100 - state.slipProb - state.reverseProb;
+    } else {
+      if (typeof s.slipProb    === 'number') state.slipProb    = Math.min(100, Math.max(0, s.slipProb));
+      if (typeof s.reverseProb === 'number') state.reverseProb = Math.min(100, Math.max(0, s.reverseProb));
+      if (typeof s.normalProb  === 'number') state.normalProb  = Math.min(100, Math.max(0, s.normalProb));
+    }
+
+    /* Ensure they sum to 100 */
+    const sum = state.normalProb + state.slipProb + state.reverseProb;
+    if (sum !== 100) {
+      state.normalProb = Math.max(0, 100 - state.slipProb - state.reverseProb);
+    }
+
+  } catch(e) {}
+}
+
+function saveState() {
+  try {
+    localStorage.setItem('rlt_v3', JSON.stringify(state));
+  } catch(e) {}
+}
+
+/* ===========================
+   CANVAS / WHEEL
+=========================== */
+function setupCanvas() {
+  const wrap = document.getElementById('wheelWrap');
+  const area = document.getElementById('wheelArea');
+  /* Calculate available space from wheelArea */
+  const areaW = area.clientWidth - 24;  /* minus padding */
+  const areaH = area.clientHeight - 10;
+  let size = Math.min(areaW, areaH, 430);
+  /* Ultimate fallback */
+  if (size <= 50) size = Math.min(window.innerWidth - 24, window.innerHeight * 0.5, 430);
+  /* Apply explicit size to wrap */
+  wrap.style.width  = size + 'px';
+  wrap.style.height = size + 'px';
+  const dpr  = window.devicePixelRatio || 1;
+  canvas.width  = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+}
+
+function drawWheel(angle) {
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = canvas.width;
+  const H    = canvas.height;
+  const SIZE = W / dpr;
+  const cx   = SIZE / 2;
+  const cy   = SIZE / 2;
+  const R    = SIZE / 2 - 5;
+  const n    = state.names.length;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  if (n < 1) return;
+
+  const seg = (Math.PI * 2) / n;
+
+  /* ----- segments ----- */
+  for (let i = 0; i < n; i++) {
+    const a0 = angle - Math.PI / 2 + i * seg;
+    const a1 = a0 + seg;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, a0, a1);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+
+    /* border */
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+
+  /* ----- text ----- */
+  for (let i = 0; i < n; i++) {
+    const a0 = angle - Math.PI / 2 + i * seg;
+    const midAngle = a0 + seg / 2;
+    const name = state.names[i];
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(midAngle);
+
+    /* Adaptive font size */
+    const arcLen   = R * seg;
+    const charW    = Math.max(name.length, 1);
+    let fontSize   = Math.min(
+      30,
+      Math.floor(arcLen * 0.38 / charW),
+      Math.floor(R * 0.38)
+    );
+    fontSize = Math.max(fontSize, 9);
+    if (n >= 12) fontSize = Math.min(fontSize, 16);
+    if (n >= 16) fontSize = Math.min(fontSize, 13);
+
+    ctx.font = `bold ${fontSize}px -apple-system, "Hiragino Sans", sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur   = 3;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    const textR = R * 0.60;
+
+    /* Truncate if needed */
+    let display = name;
+    const maxChars = Math.max(2, Math.floor((arcLen * 0.82) / (fontSize * 0.62)));
+    if (display.length > maxChars) {
+      display = display.slice(0, maxChars - 1) + '…';
+    }
+
+    ctx.fillText(display, textR, 0);
+    ctx.restore();
+  }
+
+  /* ----- outer rim ----- */
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+}
+
+/* Map angle → segment index (0-based) under the pointer (top / -PI/2) */
+function angleToSegIdx(angle) {
+  const n   = state.names.length;
+  const seg = (Math.PI * 2) / n;
+  let offset = ((-angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  return Math.floor(offset / seg) % n;
+}
+
+/* Given desired segment index, compute an angle that places its centre at the pointer (top) */
+function idxToAngle(idx) {
+  const n   = state.names.length;
+  const seg = (Math.PI * 2) / n;
+  return -idx * seg - seg / 2;
+}
+
+/* ===========================
+   EASING
+=========================== */
+const ease = {
+  outQuint:    t => 1 - Math.pow(1 - t, 5),
+  outCubic:    t => 1 - Math.pow(1 - t, 3),
+  inOutSine:   t => -(Math.cos(Math.PI * t) - 1) / 2,
+  inOutCubic:  t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+};
+
+/* Generic tween — supports early cutoff via stopAtProgress */
+function tween(from, to, duration, easeFn, onTick, onDone, stopAtProgress) {
+  const cutoff = (stopAtProgress !== undefined) ? stopAtProgress : 1;
+  const t0 = performance.now();
+  let prevVal = from;
+
+  function frame(now) {
+    const rawP = Math.min((now - t0) / duration, 1);
+    const p    = Math.min(rawP, cutoff);
+    const v    = from + (to - from) * easeFn(p);
+    const speed = v - prevVal;
+    prevVal = v;
+    onTick(v, speed);
+    if (rawP < cutoff) {
+      animFrameId = requestAnimationFrame(frame);
+    } else {
+      onDone(v, speed);
+    }
+  }
+  animFrameId = requestAnimationFrame(frame);
+}
+
+/* ===========================
+   SPIN LOGIC
+=========================== */
+function startSpin() {
+  if (isSpinning || state.names.length < 2) return;
+  isSpinning = true;
+  startBtn.disabled = true;
+  cancelAnimationFrame(animFrameId);
+
+  /* Initialise audio context on user gesture */
+  getAudioCtx();
+
+  const n   = state.names.length;
+  const seg = (Math.PI * 2) / n;
+
+  /* --- Determine primary target index --- */
+  let primaryIdx = state.cheatEnabled
+    ? Math.min(state.cheatTarget, n - 1)
+    : Math.floor(Math.random() * n);
+
+  /* --- Determine effect (three-slider system) --- */
+  const rng = Math.random() * 100;
+  let effect    = 'normal';
+  let slipCount = 0;
+
+  if (rng < state.slipProb) {
+    effect    = 'slip';
+    slipCount = Math.floor(Math.random() * 3) + 1;
+  } else if (rng < state.slipProb + state.reverseProb) {
+    effect    = 'reverse';
+    slipCount = Math.floor(Math.random() * 3) + 1;
+  }
+
+  /* --- Final winner index --- */
+  let winnerIdx = primaryIdx;
+  if (state.cheatEnabled) {
+    /* Cheat mode: always land on the target regardless of effect */
+    winnerIdx = primaryIdx;
+    /* Adjust primaryIdx backwards so slip/reverse visually moves TO the target */
+    if (effect === 'slip')    primaryIdx = (winnerIdx - slipCount + n) % n;
+    if (effect === 'reverse') primaryIdx = (winnerIdx + slipCount + n) % n;
+  } else {
+    if (effect === 'slip')    winnerIdx = (primaryIdx + slipCount + n) % n;
+    if (effect === 'reverse') winnerIdx = (primaryIdx - slipCount + n) % n;
+  }
+
+  /* --- Number of full rotations (natural feel) --- */
+  const fullRots = 7 + Math.floor(Math.random() * 5); // 7-11
+
+  /* --- Target angle for primary stop --- */
+  const baseAngle = idxToAngle(primaryIdx);
+  const jitter = (Math.random() - 0.5) * seg * 0.55;
+  const targetAngle1 = baseAngle + jitter;
+
+  let delta1 = (targetAngle1 - wheelAngle) % (Math.PI * 2);
+  if (delta1 <= 0.05) delta1 += Math.PI * 2;
+  delta1 += fullRots * Math.PI * 2;
+
+  const phase1End = wheelAngle + delta1;
+  const dur1 = 4200 + Math.random() * 1000;
+
+  /* Start spinning sound */
+  prevSegIdx = -1;
+  startSpinSound();
+
+  if (effect === 'normal') {
+    tween(
+      wheelAngle, phase1End, dur1, ease.outQuint,
+      (v, speed) => { wheelAngle = v; drawWheel(v); checkTickOnFrame(v, speed); },
+      (v) => {
+        wheelAngle = v;
+        drawWheel(v);
+        stopSpinSound();
+        finishSpin(angleToSegIdx(v));
+      }
+    );
+  } else {
+    /*
+     * Phase 1: decelerate to ~92% progress — wheel is still slowly moving.
+     * Phase 2: immediately transition into slip/reverse while residual momentum
+     * makes the motion feel natural (no full stop before sliding).
+     */
+    const PHASE1_CUTOFF = 0.92;
+
+    tween(
+      wheelAngle, phase1End, dur1, ease.outQuint,
+      (v, speed) => { wheelAngle = v; drawWheel(v); checkTickOnFrame(v, speed); },
+      (v, residualSpeed) => {
+        /* Wheel is still barely moving — start phase 2 immediately */
+        wheelAngle = v;
+        drawWheel(v);
+        stopSpinSound();
+
+        /* Phase 2: slip forward or reverse — land exactly on winnerIdx */
+        const phase2Start = wheelAngle;
+        const winnerAngle = idxToAngle(winnerIdx);
+        /* Compute delta to reach winnerIdx centre, adding slight jitter within segment */
+        const jitter2 = (Math.random() - 0.5) * seg * 0.3;
+        let slipDelta = (winnerAngle + jitter2) - phase2Start;
+        /* Normalise: slip must go forward (positive), reverse must go backward (negative) */
+        if (effect === 'slip') {
+          slipDelta = ((slipDelta % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+          if (slipDelta < 0.1) slipDelta += Math.PI * 2;
+        } else {
+          slipDelta = ((slipDelta % (Math.PI * 2)) - Math.PI * 2) % (Math.PI * 2);
+          if (slipDelta > -0.1) slipDelta -= Math.PI * 2;
+        }
+        const phase2End = phase2Start + slipDelta;
+        const dur2 = 480 + slipCount * 190;
+
+        /* Play whoosh sound at start of slip */
+        playSlipSound(effect === 'reverse');
+
+        tween(
+          phase2Start, phase2End, dur2, ease.inOutCubic,
+          (v) => { wheelAngle = v; drawWheel(v); },
+          (v) => { wheelAngle = v; drawWheel(v); finishSpin(angleToSegIdx(v)); }
+        );
+      },
+      PHASE1_CUTOFF
+    );
+  }
+}
+
+function finishSpin(winnerIdx) {
+  isSpinning = false;
+  startBtn.disabled = false;
+  saveState();
+  showResult(winnerIdx);
+}
+
+/* ===========================
+   RESULT
+=========================== */
+function showResult(idx) {
+  const name  = state.names[idx];
+  const color = COLORS[idx % COLORS.length];
+
+  resultEmoji.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+  resultName.textContent  = name;
+  resultCard.style.setProperty('--result-color', color);
+
+  resultOverlay.classList.add('open');
+  launchConfetti(color);
+  playFanfare();
+}
+
+resultOkBtn.addEventListener('click', () => {
+  resultOverlay.classList.remove('open');
+  stopConfetti();
+});
+
+/* ===========================
+   CONFETTI
+=========================== */
+let confParts  = [];
+let confAnimId = null;
+let confActive = false;
+
+function launchConfetti(accent) {
+  confettiCanvas.style.display = 'block';
+  confettiCanvas.width  = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+
+  const palette = ['#ff3b3b','#fbbf24','#22c55e','#3b6fff','#ec4899', accent];
+  confParts = [];
+
+  for (let i = 0; i < 130; i++) {
+    confParts.push({
+      x:   Math.random() * confettiCanvas.width,
+      y:  -10 - Math.random() * 80,
+      w:   5 + Math.random() * 9,
+      h:   3 + Math.random() * 5,
+      col: palette[Math.floor(Math.random() * palette.length)],
+      vx:  (Math.random() - 0.5) * 4.5,
+      vy:  2.5 + Math.random() * 4.5,
+      ang: Math.random() * Math.PI * 2,
+      spd: (Math.random() - 0.5) * 0.18,
+      grav: 0.1 + Math.random() * 0.1
+    });
+  }
+
+  confActive = true;
+  tickConfetti();
+}
+
+function tickConfetti() {
+  if (!confActive) return;
+  cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+  for (const p of confParts) {
+    p.x   += p.vx;
+    p.y   += p.vy;
+    p.vy  += p.grav;
+    p.ang += p.spd;
+
+    const alpha = Math.max(0, 1 - p.y / (confettiCanvas.height * 1.05));
+    cctx.save();
+    cctx.globalAlpha = alpha;
+    cctx.translate(p.x, p.y);
+    cctx.rotate(p.ang);
+    cctx.fillStyle = p.col;
+    cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cctx.restore();
+  }
+
+  confParts = confParts.filter(p => p.y < confettiCanvas.height + 30);
+
+  if (confParts.length > 0) {
+    confAnimId = requestAnimationFrame(tickConfetti);
+  } else {
+    confettiCanvas.style.display = 'none';
+    confActive = false;
+  }
+}
+
+function stopConfetti() {
+  confActive = false;
+  cancelAnimationFrame(confAnimId);
+  cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  confettiCanvas.style.display = 'none';
+}
+
+/* ===========================
+   PROBABILITY SLIDERS
+=========================== */
+/* Update slider track fill via CSS custom property */
+function updateSliderFill(slider) {
+  const pct = slider.value + '%';
+  slider.style.setProperty('--fill', pct);
+}
+
+/* Linked slider logic: when one moves, distribute remainder proportionally to the others */
+function onSliderInput(movedId) {
+  const sliders = [
+    { id: 'normalSlider',  el: normalSlider,  pctEl: normalPct  },
+    { id: 'slipSlider',    el: slipSlider,    pctEl: slipPct    },
+    { id: 'reverseSlider', el: reverseSlider, pctEl: reversePct }
+  ];
+
+  const moved = sliders.find(s => s.id === movedId);
+  const others = sliders.filter(s => s.id !== movedId);
+
+  const movedVal = parseInt(moved.el.value);
+  const remaining = 100 - movedVal;
+
+  const otherSum = others.reduce((sum, s) => sum + parseInt(s.el.value), 0);
+
+  if (otherSum === 0) {
+    /* Split evenly */
+    const half = Math.floor(remaining / 2);
+    others[0].el.value = half;
+    others[1].el.value = remaining - half;
+  } else {
+    /* Distribute proportionally */
+    let newVals = others.map(s => Math.round(parseInt(s.el.value) / otherSum * remaining));
+    /* Correct rounding so total stays exactly 100 */
+    const diff = remaining - newVals.reduce((a, b) => a + b, 0);
+    newVals[0] += diff;
+    newVals.forEach((v, i) => { others[i].el.value = Math.max(0, v); });
+  }
+
+  /* Clamp all to [0,100] */
+  sliders.forEach(s => {
+    s.el.value = Math.max(0, Math.min(100, parseInt(s.el.value)));
+    updateSliderFill(s.el);
+    s.pctEl.textContent = s.el.value + '%';
+  });
+}
+
+normalSlider.addEventListener('input', () => onSliderInput('normalSlider'));
+slipSlider.addEventListener('input', () => onSliderInput('slipSlider'));
+reverseSlider.addEventListener('input', () => onSliderInput('reverseSlider'));
+
+/* Initialise slider fills */
+function initSliderFills() {
+  updateSliderFill(normalSlider);
+  updateSliderFill(slipSlider);
+  updateSliderFill(reverseSlider);
+}
+
+/* ===========================
+   SETTINGS PANEL
+=========================== */
+function openSettings() {
+  titleInput.value = state.title;
+
+  /* Set slider values from state */
+  normalSlider.value  = state.normalProb;
+  slipSlider.value    = state.slipProb;
+  reverseSlider.value = state.reverseProb;
+
+  normalPct.textContent  = state.normalProb  + '%';
+  slipPct.textContent    = state.slipProb    + '%';
+  reversePct.textContent = state.reverseProb + '%';
+
+  updateSliderFill(normalSlider);
+  updateSliderFill(slipSlider);
+  updateSliderFill(reverseSlider);
+
+  buildNamesList();
+  settingsOverlay.classList.add('open');
+}
+
+function closeSettings() {
+  settingsOverlay.classList.remove('open');
+}
+
+function buildNamesList() {
+  namesList.innerHTML = '';
+  state.names.forEach((name, i) => {
+    const row = document.createElement('div');
+    row.className = 'name-row';
+    row.setAttribute('role', 'listitem');
+
+    const pip = document.createElement('div');
+    pip.className = 'color-pip';
+    pip.style.background = COLORS[i % COLORS.length];
+    pip.setAttribute('aria-hidden', 'true');
+
+    const inp = document.createElement('input');
+    inp.type  = 'text';
+    inp.className   = 'name-field';
+    inp.value       = name;
+    inp.maxLength   = 12;
+    inp.placeholder = `名前 ${i + 1}`;
+    inp.setAttribute('data-idx', i);
+    inp.setAttribute('aria-label', `名前 ${i + 1}`);
+    inp.addEventListener('input', e => {
+      state.names[+e.target.getAttribute('data-idx')] = e.target.value;
+    });
+
+    const del = document.createElement('button');
+    del.className = 'del-btn';
+    del.innerHTML  = '−';
+    del.setAttribute('aria-label', `${name} を削除`);
+    del.disabled   = state.names.length <= 2;
+    del.style.opacity = state.names.length <= 2 ? '0.28' : '1';
+    del.setAttribute('data-idx', i);
+    del.addEventListener('click', e => {
+      const idx = +e.currentTarget.getAttribute('data-idx');
+      if (state.names.length > 2) {
+        state.names.splice(idx, 1);
+        if (state.cheatTarget >= state.names.length) {
+          state.cheatTarget = state.names.length - 1;
+        }
+        buildNamesList();
+        drawWheel(wheelAngle);
+      }
+    });
+
+    row.appendChild(pip);
+    row.appendChild(inp);
+    row.appendChild(del);
+    namesList.appendChild(row);
+  });
+
+  nameCountLbl.textContent = `人数: ${state.names.length}/20`;
+  addNameBtn.style.display = state.names.length >= 20 ? 'none' : 'block';
+}
+
+addNameBtn.addEventListener('click', () => {
+  if (state.names.length < 20) {
+    state.names.push('');
+    buildNamesList();
+  }
+});
+
+saveBtn.addEventListener('click', () => {
+  /* Collect names */
+  const inputs = namesList.querySelectorAll('.name-field');
+  const newNames = Array.from(inputs)
+    .map(i => i.value.trim())
+    .filter(n => n.length > 0);
+
+  if (newNames.length < 2) {
+    alert('名前を2人以上入力してください。');
+    return;
+  }
+
+  state.names       = newNames;
+  state.title       = titleInput.value.trim() || 'ルーレット';
+  state.normalProb  = parseInt(normalSlider.value);
+  state.slipProb    = parseInt(slipSlider.value);
+  state.reverseProb = parseInt(reverseSlider.value);
+
+  /* Guarantee sum == 100 (rounding safety) */
+  const probSum = state.normalProb + state.slipProb + state.reverseProb;
+  if (probSum !== 100) {
+    state.normalProb = Math.max(0, state.normalProb + (100 - probSum));
+  }
+
+  if (state.cheatTarget >= state.names.length) {
+    state.cheatTarget = 0;
+  }
+
+  saveState();
+  applyTitle();
+  drawWheel(wheelAngle);
+  updateCheatSel();
+  closeSettings();
+});
+
+settingsCloseBtn.addEventListener('click', closeSettings);
+
+settingsOverlay.addEventListener('click', e => {
+  if (e.target === settingsOverlay) closeSettings();
+});
+
+function applyTitle() {
+  const t = state.title || 'ルーレット';
+  appTitleEl.textContent = t;
+  document.title = t;
+}
+
+/* ===========================
+   GEAR BUTTON — tap vs long press
+=========================== */
+let lpTimer   = null;
+let lpFired   = false;
+let lpTouched = false;
+
+function lpStart(isTouch) {
+  lpFired   = false;
+  if (isTouch) lpTouched = true;
+  lpBar.style.display = 'block';
+  lpBarFill.style.transition = 'none';
+  lpBarFill.style.width = '0%';
+  /* Force reflow */
+  void lpBarFill.offsetWidth;
+  lpBarFill.style.transition = `width ${LONG_PRESS_MS}ms linear`;
+  lpBarFill.style.width = '100%';
+
+  lpTimer = setTimeout(() => {
+    lpFired = true;
+    lpCancel();
+    openCheatPanel();
+  }, LONG_PRESS_MS);
+}
+
+function lpCancel() {
+  clearTimeout(lpTimer);
+  lpBar.style.display = 'none';
+  lpBarFill.style.transition = 'none';
+  lpBarFill.style.width = '0%';
+}
+
+settingsBtn.addEventListener('touchstart', e => {
+  e.preventDefault();
+  lpStart(true);
+}, { passive: false });
+
+settingsBtn.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!lpFired) {
+    lpCancel();
+    doGearTap();
+  }
+  lpTouched = false;
+  lpFired   = false;
+}, { passive: false });
+
+settingsBtn.addEventListener('touchcancel', () => {
+  lpCancel();
+  lpTouched = false;
+  lpFired   = false;
+});
+
+/* Mouse fallback (desktop testing) */
+settingsBtn.addEventListener('mousedown', e => {
+  if (lpTouched) return;
+  lpStart(false);
+});
+
+settingsBtn.addEventListener('mouseup', e => {
+  if (lpTouched) return;
+  if (!lpFired) {
+    lpCancel();
+    doGearTap();
+  }
+  lpFired = false;
+});
+
+settingsBtn.addEventListener('mouseleave', () => {
+  if (!lpFired) lpCancel();
+});
+
+function doGearTap() {
+  const icon = settingsBtn.querySelector('.gear-icon');
+  settingsBtn.classList.add('spinning');
+  icon.style.transform = 'rotate(72deg)';
+  setTimeout(() => {
+    settingsBtn.classList.remove('spinning');
+    icon.style.transform = '';
+  }, 500);
+  openSettings();
+}
+
+/* ===========================
+   CHEAT PANEL
+=========================== */
+function openCheatPanel() {
+  cheatToggle.checked = state.cheatEnabled;
+  cheatTargetWrap.classList.toggle('show', state.cheatEnabled);
+  updateCheatSel();
+  cheatOverlay.classList.add('open');
+}
+
+function closeCheatPanel() {
+  cheatOverlay.classList.remove('open');
+}
+
+function updateCheatSel() {
+  cheatTargetSel.innerHTML = '';
+  state.names.forEach((name, i) => {
+    const opt = document.createElement('option');
+    opt.value       = i;
+    opt.textContent = name || `名前 ${i + 1}`;
+    cheatTargetSel.appendChild(opt);
+  });
+  cheatTargetSel.value = Math.min(state.cheatTarget, state.names.length - 1);
+}
+
+cheatToggle.addEventListener('change', () => {
+  state.cheatEnabled = cheatToggle.checked;
+  cheatTargetWrap.classList.toggle('show', state.cheatEnabled);
+  updateCheatDot();
+  saveState();
+});
+
+cheatTargetSel.addEventListener('change', () => {
+  state.cheatTarget = parseInt(cheatTargetSel.value);
+  saveState();
+});
+
+cheatCloseBtn.addEventListener('click', closeCheatPanel);
+
+cheatOverlay.addEventListener('click', e => {
+  if (e.target === cheatOverlay) closeCheatPanel();
+});
+
+function updateCheatDot() {
+  cheatDot.style.display = state.cheatEnabled ? 'block' : 'none';
+}
+
+/* ===========================
+   START BUTTON
+=========================== */
+startBtn.addEventListener('click', startSpin);
+startBtn.addEventListener('touchstart', e => {
+  /* Let click fire naturally; just prevent double-fire from iOS */
+}, { passive: true });
+
+/* ===========================
+   PREVENT UNWANTED BROWSER BEHAVIOUR
+=========================== */
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+document.addEventListener('dblclick', e => e.preventDefault());
+
+/* ===========================
+   RESIZE
+=========================== */
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    setupCanvas();
+    drawWheel(wheelAngle);
+  }, 80);
+});
+
+/* ===========================
+   BOOT
+=========================== */
+function boot() {
+  loadState();
+  applyTitle();
+  setupCanvas();
+  drawWheel(wheelAngle);
+  updateCheatDot();
+  initSliderFills();
+
+  /* Ensure canvas is properly sized after first layout */
+  requestAnimationFrame(() => {
+    setupCanvas();
+    drawWheel(wheelAngle);
+  });
+  /* Extra fallback for slow mobile rendering */
+  setTimeout(() => {
+    setupCanvas();
+    drawWheel(wheelAngle);
+  }, 300);
+}
+
+boot();
+
+})();
+</script>
+</body>
+</html>
