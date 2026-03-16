@@ -1562,7 +1562,8 @@ function loadState() {
       state.names = s.names.slice(0, 20);
     }
     if (typeof s.title === 'string') state.title = s.title;
-    if (typeof s.cheatEnabled === 'boolean') state.cheatEnabled = s.cheatEnabled;
+    /* cheatEnabled is always OFF on launch */
+    state.cheatEnabled = false;
     if (typeof s.cheatTarget === 'number') {
       state.cheatTarget = Math.min(s.cheatTarget, state.names.length - 1);
     }
@@ -1868,6 +1869,11 @@ function startSpin() {
 function finishSpin(winnerIdx) {
   isSpinning = false;
   startBtn.disabled = false;
+  /* Auto-disable cheat after use */
+  if (state.cheatEnabled) {
+    state.cheatEnabled = false;
+    updateCheatDot();
+  }
   saveState();
   showResult(winnerIdx);
 }
